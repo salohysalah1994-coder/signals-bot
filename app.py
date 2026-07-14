@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
+import pytz
 
 # Page Configuration
 st.set_page_config(page_title="Salah Signal Net", layout="centered")
@@ -63,12 +64,12 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# App Title with your name!
+# App Title
 st.title("Salah Signal Net 🎯")
 st.markdown("### REAL-TIME SIGNAL GENERATOR")
 st.markdown("---")
 
-# All Assets from your template (Formatted for yfinance compatibility)
+# All Assets
 asset_mapping = {
     "AUD/CAD": "AUDCAD=X", "AUD/CHF": "AUDCHF=X", "AUD/JPY": "AUDJPY=X", 
     "AUD/NZD": "AUDNZD=X", "AUD/USD": "AUDUSD=X", "CAD/CHF": "CADCHF=X", 
@@ -83,7 +84,6 @@ asset_mapping = {
     "USCrude": "CL=F", "UKBrent": "BZ=F"
 }
 
-# Assets dropdown using friendly names
 st.subheader("Available Assets:")
 selected_asset_name = st.selectbox("", list(asset_mapping.keys()))
 selected_ticker = asset_mapping[selected_asset_name]
@@ -100,14 +100,12 @@ show_backtest = st.checkbox("Show only backtested signals (95% accuracy)", value
 if st.button("Generate Signals"):
     st.write(f"Fetching 5-minute data for {selected_asset_name}...")
     try:
-        # Fetch actual real-time 5m data
         ticker = yf.Ticker(selected_ticker)
         data = ticker.history(period="2d", interval="5m")
         
         if not data.empty:
             st.success(f"Data for {selected_asset_name} fetched successfully!")
             
-            # Simple technical calculation for signal direction (CALL/PUT)
             data['SMA'] = data['Close'].rolling(window=5).mean()
             last_rows = data.tail(num_signals)
             
@@ -118,13 +116,17 @@ if st.button("Generate Signals"):
                 price = float(row['Close'])
                 sma = float(row['SMA']) if pd.notna(row['SMA']) else price
                 
-                # Format time to simple 12-hour format
-                time_str = last_rows.index[i].strftime('%I:%M %p')
+                # تحويل الوقت إلى توقيتك المحلي تلقائياً
+                utc_time = last_rows.index[i].to_pydatetime()
+                # تحديد المنطقة الزمنية لليمن/مكة المكرمة (UTC+3) لتتطابق مع ساعتك تماماً
+                local_tz = pytz.timezone('Asia/Aden')
+                local_time = utc_time.astimezone(local_tz)
                 
-                # Determine action (CALL instead of BUY, PUT instead of SELL)
+                # صيغة الوقت (ساعة:دقيقة صباحاً/مساءً)
+                time_str = local_time.strftime('%I:%M %p')
+                
                 action = "CALL 🟢" if price > sma else "PUT 🔴"
                 
-                # Apply filter
                 if signal_type == "CALL Only" and "PUT" in action:
                     continue
                 if signal_type == "PUT Only" and "CALL" in action:
@@ -138,7 +140,6 @@ if st.button("Generate Signals"):
                 })
             
             if signals:
-                # Newest signals on top
                 signals.reverse()
                 df_signals = pd.DataFrame(signals)
                 st.table(df_signals)
@@ -149,6 +150,5 @@ if st.button("Generate Signals"):
     except Exception as e:
         st.error(f"Error generating signals: {e}")
 
-# Reset button
 if st.button("Reset Signals"):
     st.rerun()
