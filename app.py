@@ -47,7 +47,7 @@ st.write("---")
 
 # User Inputs
 st.write("### Available Assets:")
-asset = st.selectbox("", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X"], index=0)
+assets = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "GC=F", "CL=F", "BTC-USD", "ETH-USD"]
 
 st.write("### Number of Signals to Generate:")
 num_signals = st.number_input("", min_value=1, max_value=20, value=5, step=1)
