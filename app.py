@@ -9,7 +9,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# كود الـ HTML والـ JavaScript الخاص بك
+# كود الـ HTML والـ JavaScript الخاص بك مع التعديل لـ 5 دقائق
 html_code = """
 <!DOCTYPE html>
 <html lang="en">
@@ -120,7 +120,7 @@ html_code = """
 <body>
     <div class="container">
         <h1>SALAH REAL-TIME SIGNAL GENERATOR</h1>
-        <p>SALAH SIGNAL SOFTWARE</p>
+        <p>SALAH SIGNAL SOFTWARE (M5 - 5 MINUTES)</p>
         <p id="timezone-info">Timezone: Asia/Dhaka | Date: <span id="current-date"></span> | Time: <span id="current-time"></span></p>
         
         <h3>Join our Telegram Channel:</h3>
@@ -131,7 +131,7 @@ html_code = """
             <option value="">Select an asset</option>
         </select>
 
-        <h3>Number of Signals to Generate:</h3>
+        <h3>Number of Signals to Generate (M5):</h3>
         <input type="number" id="signal-count" value="1" min="1" />
 
         <h3>Filter Signals:</h3>
@@ -154,7 +154,7 @@ html_code = """
 
         <p id="error-message" class="error-message"></p>
         
-        <h3>Generated Signals:</h3>
+        <h3>Generated Signals (5-Min Expiration):</h3>
         <ul id="signal-list"></ul>
         
         <div id="animation-message" class="animation-message">
@@ -195,7 +195,8 @@ html_code = """
             const times = [];
             let baseTime = new Date();
             for (let i = 0; i < count; i++) {
-                baseTime.setMinutes(baseTime.getMinutes() + 3); // صفقة كل 3 دقائق
+                // تم تعديل السطر بالأسفل ليصبح الفارق 5 دقائق لكل صفقة بنجاح
+                baseTime.setMinutes(baseTime.getMinutes() + 5); 
                 times.push(formatTimeInDhaka(baseTime));
             }
             return times;
@@ -249,7 +250,8 @@ html_code = """
             filteredSignals.forEach(signal => {
                 const listItem = document.createElement('li');
                 const backtestText = signal.backtested ? ' <span class="backtest-badge">[95% ACCURACY ✓]</span>' : '';
-                listItem.innerHTML = `${signal.asset} ; ${signal.time} ; ${signal.direction}${backtestText}`;
+                // يوضح الكود الآن بجانب كل إشارة بأنها شمعة وصفقة 5 دقائق (M5)
+                listItem.innerHTML = `${signal.asset} ; ${signal.time} ; ${signal.direction} ; 5 MIN ${backtestText}`;
                 signalList.appendChild(listItem);
             });
         }
