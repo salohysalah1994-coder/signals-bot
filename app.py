@@ -3,7 +3,7 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
 
-# Theme Settings
+# Page Configuration
 st.set_page_config(page_title="Quantum Signal Net", layout="centered")
 
 st.markdown("""
@@ -45,7 +45,7 @@ st.markdown("""
 st.title("Quantum Signal Net")
 st.markdown("---")
 
-# All official assets list
+# All official major forex pairs, commodities, and cryptos
 assets = [
     "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", 
     "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURGBP=X", 
@@ -64,16 +64,16 @@ signal_type = st.selectbox("Type", ["All", "Buy Only", "Sell Only"])
 
 show_backtest = st.checkbox("Show only backtested signals (95% accuracy)", value=True)
 
-# Generate Signals Button
+# Generate Signals Action
 if st.button("Generate Signals"):
     st.write(f"Fetching data for {selected_asset}...")
     try:
-        # Fetch actual data from yfinance
+        # Fetch data from yfinance
         data = yf.download(selected_asset, period="7d", interval="1h")
         if not data.empty:
             st.success(f"Data for {selected_asset} fetched successfully!")
             
-            # Simple technical calculations for signal generation
+            # Simple SMA calculation to generate signals
             data['SMA'] = data['Close'].rolling(window=5).mean()
             last_rows = data.tail(num_signals)
             
@@ -84,10 +84,10 @@ if st.button("Generate Signals"):
                 sma = float(row['SMA'])
                 time_str = last_rows.index[i].strftime('%Y-%m-%d %H:%M')
                 
-                # Determine buy/sell based on simple SMA cross
+                # Determine action
                 action = "Buy" if price > sma else "Sell"
                 
-                # Filter results
+                # Apply filter
                 if signal_type == "Buy Only" and action == "Sell":
                     continue
                 if signal_type == "Sell Only" and action == "Buy":
@@ -110,5 +110,6 @@ if st.button("Generate Signals"):
     except Exception as e:
         st.error(f"Error generating signals: {e}")
 
+# Correct and updated rerun logic
 if st.button("Reset Signals"):
-    st.experimental_rerun()
+    st.rerun()
