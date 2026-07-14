@@ -7,18 +7,81 @@ from datetime import datetime, timedelta
 # Page Configuration
 st.set_page_config(page_title="Salah Signal Net", layout="centered")
 
-# Custom Styling (Pink & Black theme with clear black text for buttons/headers)
+# Custom Styling (Light Pink background with solid Black text and elements)
 st.markdown("""
     <style>
-    .main { background-color: #000000; }
-    h1, h2, h3, p, label { color: #FF69B4 !important; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    .stButton>button { background-color: #FF69B4 !important; color: #000000 !important; font-weight: bold; border-radius: 8px; width: 100%; font-size: 18px; }
-    .stSelectbox div[data-baseweb="select"] { background-color: #111111 !important; color: #FF69B4 !important; border: 1px solid #FF69B4 !important; }
-    .stNumberInput div[data-baseweb="input"] { background-color: #111111 !important; color: #FF69B4 !important; border: 1px solid #FF69B4 !important; }
-    input { color: #FF69B4 !important; }
-    table { width: 100%; color: white; border: 1px solid #FF69B4; }
-    th { background-color: #FF69B4 !important; color: #000000 !important; text-align: center !important; }
-    td { text-align: center !important; padding: 10px; }
+    /* Background setup (Light Pink) */
+    .main {
+        background-color: #FFC0CB !important; /* Soft Light Pink */
+    }
+    
+    /* Global text color to Black */
+    h1, h2, h3, p, label, span, .stMarkdown, p {
+        color: #000000 !important; 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-weight: bold;
+    }
+    
+    /* Buttons (Solid Black background with White/Pink text) */
+    .stButton>button {
+        background-color: #000000 !important;
+        color: #FFC0CB !important; /* Light Pink text inside black button */
+        font-weight: bold;
+        border-radius: 8px;
+        width: 100%;
+        font-size: 18px;
+        border: 2px solid #000000;
+    }
+    
+    /* Selectboxes and Inputs (Black borders, white/light pink background, black text) */
+    .stSelectbox div[data-baseweb="select"] {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border: 2px solid #000000 !important;
+    }
+    .stNumberInput div[data-baseweb="input"] {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border: 2px solid #000000 !important;
+    }
+    input {
+        color: #000000 !important;
+        font-weight: bold !important;
+    }
+    
+    /* Table Styling (Black text on transparent/white rows with black headers) */
+    table {
+        width: 100%;
+        color: #000000 !important;
+        border: 2px solid #000000 !important;
+        background-color: #FFFFFF !important;
+        border-collapse: collapse;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    th {
+        background-color: #000000 !important;
+        color: #FFFFFF !important; /* White text for black headers */
+        font-weight: bold;
+        padding: 10px;
+        text-align: center !important;
+    }
+    td {
+        color: #000000 !important;
+        padding: 10px;
+        border-bottom: 1px solid #CCCCCC;
+        text-align: center !important;
+        font-weight: bold;
+    }
+    
+    /* Info and Warning boxes styling override to match black text */
+    .stAlert {
+        background-color: #FFF0F5 !important;
+        border: 1px solid #000000 !important;
+    }
+    .stAlert p {
+        color: #000000 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
