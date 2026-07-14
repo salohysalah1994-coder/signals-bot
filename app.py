@@ -7,84 +7,94 @@ from datetime import datetime, timedelta
 # Page Configuration
 st.set_page_config(page_title="Salah Signal Net", layout="centered")
 
-# Custom Styling (Light Pink Background, Solid Black Text, & Ultra-Clean Table)
+# Custom Styling (Elegant Black & White Theme with Clean Compact Table)
 st.markdown("""
     <style>
-    /* Background setup (Beautiful Light Pink) */
+    /* Background setup (Clean White / Light Gray) */
     .main { 
-        background-color: #FFC0CB !important; 
+        background-color: #F4F6F9 !important; 
     }
     
-    /* Global text color set to Black */
+    /* Global text color set to Solid Black */
     h1, h2, h3, p, label, span, .stMarkdown { 
         color: #000000 !important; 
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         font-weight: bold;
     }
     
-    /* Buttons (Black background with White text) */
+    /* Solid Black Buttons with White Text */
     .stButton>button { 
         background-color: #000000 !important; 
         color: #FFFFFF !important; 
         font-weight: bold; 
-        border-radius: 8px; 
+        border-radius: 6px; 
         width: 100%; 
-        font-size: 18px; 
+        font-size: 16px; 
         border: 2px solid #000000;
+        transition: 0.3s;
+    }
+    .stButton>button:hover {
+        background-color: #222222 !important;
+        border-color: #222222 !important;
     }
     
-    /* Selectboxes and Inputs */
+    /* Input & Selectbox Styling (Sharp Black Borders) */
     .stSelectbox div[data-baseweb="select"] { 
         background-color: #FFFFFF !important; 
         color: #000000 !important; 
         border: 2px solid #000000 !important; 
+        border-radius: 6px !important;
     }
     .stNumberInput div[data-baseweb="input"] { 
         background-color: #FFFFFF !important; 
         color: #000000 !important; 
         border: 2px solid #000000 !important; 
+        border-radius: 6px !important;
     }
     input { 
         color: #000000 !important; 
         font-weight: bold !important;
     }
     
-    /* Ultra-Clean & Highly Organized Table Styling */
+    /* Compact, Sharp, and Symmetric Table Styling */
     table { 
         width: 100%; 
         color: #000000 !important; 
         border: 2px solid #000000 !important; 
         background-color: #FFFFFF !important; 
         border-collapse: collapse !important;
-        border-radius: 10px !important;
+        border-radius: 8px !important;
         overflow: hidden !important;
         margin-top: 15px;
+        box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);
     }
     th { 
         background-color: #000000 !important; 
         color: #FFFFFF !important; 
         font-weight: bold !important; 
-        padding: 12px 10px !important; 
+        padding: 8px 10px !important; 
         text-align: center !important; 
         border: 1px solid #000000 !important;
+        font-size: 14px !important;
     }
     td { 
         color: #000000 !important; 
-        padding: 12px 10px !important; 
-        border: 1px solid #E0E0E0 !important; 
+        padding: 8px 10px !important; 
+        border: 1px solid #CCCCCC !important; 
         text-align: center !important; 
         font-weight: bold !important;
+        font-size: 13px !important;
     }
-    /* Alternating row colors for ultimate readability */
+    /* Alternating row colors for quick scanning */
     tr:nth-child(even) {
         background-color: #F9F9F9 !important;
     }
     
-    /* Alert / Tip Box Styling override to stay clean */
+    /* Notification / Tip Box Styling override to stay clean and professional */
     .stAlert {
         background-color: #FFFFFF !important;
         border: 2px solid #000000 !important;
-        border-radius: 8px;
+        border-radius: 6px;
     }
     .stAlert p {
         color: #000000 !important;
@@ -140,7 +150,6 @@ if st.button("Generate Live Signals 🚀"):
             base_time = datetime.now(local_tz)
             
             signals = []
-            martingale_count = 1
             
             last_close = float(data['Close'].iloc[-1])
             last_sma_fast = float(data['SMA_fast'].iloc[-1])
@@ -152,18 +161,6 @@ if st.button("Generate Live Signals 🚀"):
                 # 3-minute gap between trades
                 signal_time = base_time + timedelta(minutes=i * 3)
                 time_str = signal_time.strftime('%I:%M %p')
-                
-                # Martingale Logic
-                if i > 0:
-                    prev_win = (i % 2 == 0)  # Simulated win/loss outcome to trigger Martingale
-                    if not prev_win:
-                        martingale_count *= 2
-                        m_text = f"Martingale X{martingale_count} ⚠️"
-                    else:
-                        martingale_count = 1
-                        m_text = "Base Trade"
-                else:
-                    m_text = "Base Trade"
                 
                 # Signal Action Choice
                 if is_uptrend:
@@ -177,16 +174,12 @@ if st.button("Generate Live Signals 🚀"):
                 if signal_type == "PUT Only" and "CALL" in action:
                     continue
                 
-                # Safe Price Calculation
-                display_price = round(last_close + (i * 0.00005 if is_uptrend else -i * 0.00005), 5)
-                
+                # ترتيب الأعمدة: الزوج -> بيع أو شراء -> الوقت -> زمن الصفقة
                 signals.append({
-                    "Time": time_str,
                     "Asset": selected_asset_name,
-                    "Action": action,
-                    "Entry Price": display_price,
-                    "Expiry": expiry_time,
-                    "Martingale": m_text
+                    "Action (Buy/Sell)": action,
+                    "Time": time_str,
+                    "Expiry": expiry_time
                 })
             
             if signals:
