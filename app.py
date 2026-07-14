@@ -9,7 +9,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# كود الـ HTML والـ JavaScript الخاص بك مع التعديل لـ 5 دقائق
+# كود الـ HTML والـ JavaScript مع ميزة اختيار الفاصل الزمني (1, 5, 15 دقيقة)
 html_code = """
 <!DOCTYPE html>
 <html lang="en">
@@ -120,7 +120,7 @@ html_code = """
 <body>
     <div class="container">
         <h1>SALAH REAL-TIME SIGNAL GENERATOR</h1>
-        <p>SALAH SIGNAL SOFTWARE (M5 - 5 MINUTES)</p>
+        <p>SALAH SIGNAL SOFTWARE (MULTI-TIMEFRAME)</p>
         <p id="timezone-info">Timezone: Asia/Dhaka | Date: <span id="current-date"></span> | Time: <span id="current-time"></span></p>
         
         <h3>Join our Telegram Channel:</h3>
@@ -131,7 +131,14 @@ html_code = """
             <option value="">Select an asset</option>
         </select>
 
-        <h3>Number of Signals to Generate (M5):</h3>
+        <h3>Select Timeframe (Expiration):</h3>
+        <select id="timeframe-select">
+            <option value="1">1 Minute (M1)</option>
+            <option value="5" selected>5 Minutes (M5)</option>
+            <option value="15">15 Minutes (M15)</option>
+        </select>
+
+        <h3>Number of Signals to Generate:</h3>
         <input type="number" id="signal-count" value="1" min="1" />
 
         <h3>Filter Signals:</h3>
@@ -154,7 +161,7 @@ html_code = """
 
         <p id="error-message" class="error-message"></p>
         
-        <h3>Generated Signals (5-Min Expiration):</h3>
+        <h3>Generated Signals:</h3>
         <ul id="signal-list"></ul>
         
         <div id="animation-message" class="animation-message">
@@ -185,18 +192,18 @@ html_code = """
             });
         }
 
-        function generateSignal(asset, time) {
+        function generateSignal(asset, time, timeframe) {
             const direction = Math.random() < 0.5 ? 'CALL' : 'PUT';
             const backtested = Math.random() < 0.4; 
-            return { asset, time, direction, backtested };
+            return { asset, time, direction, backtested, timeframe };
         }
 
-        function generateUniqueTimes(count) {
+        function generateUniqueTimes(count, interval) {
             const times = [];
             let baseTime = new Date();
             for (let i = 0; i < count; i++) {
-                // تم تعديل السطر بالأسفل ليصبح الفارق 5 دقائق لكل صفقة بنجاح
-                baseTime.setMinutes(baseTime.getMinutes() + 5); 
+                // الفاصل الزمني يتغير تلقائياً حسب اختيارك (1 أو 5 أو 15)
+                baseTime.setMinutes(baseTime.getMinutes() + interval); 
                 times.push(formatTimeInDhaka(baseTime));
             }
             return times;
@@ -204,6 +211,7 @@ html_code = """
 
         function handleGenerateSignals() {
             const selectedAsset = document.getElementById('asset-select').value;
+            const timeframe = Number(document.getElementById('timeframe-select').value);
             const signalCount = Number(document.getElementById('signal-count').value);
             const errorMessage = document.getElementById('error-message');
             
@@ -213,13 +221,13 @@ html_code = """
             }
 
             errorMessage.textContent = '';
-            const uniqueTimes = generateUniqueTimes(signalCount);
+            const uniqueTimes = generateUniqueTimes(signalCount, timeframe);
             let addedNew = false;
 
             uniqueTimes.forEach((time) => {
-                const signalKey = `${selectedAsset} ; ${time}`;
+                const signalKey = `${selectedAsset} ; ${time} ; ${timeframe}MIN`;
                 if (!existingSignals.has(signalKey)) {
-                    const newSignal = generateSignal(selectedAsset, time);
+                    const newSignal = generateSignal(selectedAsset, time, timeframe);
                     signals.push(newSignal);
                     existingSignals.add(signalKey);
                     addedNew = true;
@@ -230,7 +238,7 @@ html_code = """
                 renderSignals();
                 showAnimation();
             } else {
-                errorMessage.textContent = 'Signals for these times have already been generated!';
+                errorMessage.textContent = 'Signals for these times and timeframe have already been generated!';
             }
         }
 
@@ -250,8 +258,8 @@ html_code = """
             filteredSignals.forEach(signal => {
                 const listItem = document.createElement('li');
                 const backtestText = signal.backtested ? ' <span class="backtest-badge">[95% ACCURACY ✓]</span>' : '';
-                // يوضح الكود الآن بجانب كل إشارة بأنها شمعة وصفقة 5 دقائق (M5)
-                listItem.innerHTML = `${signal.asset} ; ${signal.time} ; ${signal.direction} ; 5 MIN ${backtestText}`;
+                // يظهر هنا الوقت المحدد للصفقة بشكل ديناميكي (1 MIN, 5 MIN, 15 MIN)
+                listItem.innerHTML = `${signal.asset} ; ${signal.time} ; ${signal.direction} ; ${signal.timeframe} MIN ${backtestText}`;
                 signalList.appendChild(listItem);
             });
         }
