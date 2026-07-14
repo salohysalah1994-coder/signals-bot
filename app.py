@@ -68,8 +68,10 @@ show_backtest = st.checkbox("Show only backtested signals (95% accuracy)", value
 if st.button("Generate Signals"):
     st.write(f"Fetching data for {selected_asset}...")
     try:
-        # Fetch data from yfinance
-        data = yf.download(selected_asset, period="7d", interval="1h")
+        # Fetch data safely using Ticker history to avoid Multi-Index errors
+        ticker = yf.Ticker(selected_asset)
+        data = ticker.history(period="7d", interval="1h")
+        
         if not data.empty:
             st.success(f"Data for {selected_asset} fetched successfully!")
             
@@ -80,8 +82,11 @@ if st.button("Generate Signals"):
             signals = []
             for i in range(len(last_rows)):
                 row = last_rows.iloc[i]
+                
+                # Extract single float values safely
                 price = float(row['Close'])
-                sma = float(row['SMA'])
+                sma = float(row['SMA']) if pd.notna(row['SMA']) else price
+                
                 time_str = last_rows.index[i].strftime('%Y-%m-%d %H:%M')
                 
                 # Determine action
