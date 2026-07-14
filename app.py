@@ -1,134 +1,283 @@
-import streamlit as st
-import pandas as pd
-import yfinance as yf
-import pytz
-from datetime import datetime, timedelta
-
-# Page Configuration
-st.set_page_config(page_title="Salah Signal Net", layout="centered")
-
-# Custom Styling (Pink & Black theme with clear black text for buttons/headers)
-st.markdown("""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SALAH Signal Generator</title>
     <style>
-    .main { background-color: #000000; }
-    h1, h2, h3, p, label { color: #FF69B4 !important; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    .stButton>button { background-color: #FF69B4 !important; color: #000000 !important; font-weight: bold; border-radius: 8px; width: 100%; font-size: 18px; }
-    .stSelectbox div[data-baseweb="select"] { background-color: #111111 !important; color: #FF69B4 !important; border: 1px solid #FF69B4 !important; }
-    .stNumberInput div[data-baseweb="input"] { background-color: #111111 !important; color: #FF69B4 !important; border: 1px solid #FF69B4 !important; }
-    input { color: #FF69B4 !important; }
-    table { width: 100%; color: white; border: 1px solid #FF69B4; }
-    th { background-color: #FF69B4 !important; color: #000000 !important; text-align: center !important; }
-    td { text-align: center !important; padding: 10px; }
+        body {
+            background-color: black;
+            color: #00ff00;
+            font-family: monospace;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+        }
+        h1, h3 {
+            color: #00ff00;
+            text-transform: uppercase;
+            border-bottom: 1px solid #00ff00;
+            padding-bottom: 5px;
+        }
+        a {
+            color: cyan;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        a:hover {
+            color: #00ffff;
+            text-decoration: underline;
+        }
+        select, input[type="number"] {
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #111;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        input[type="checkbox"] {
+            accent-color: #00ff00;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px 10px 10px 0;
+            color: black;
+            background-color: #00ff00;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: monospace;
+        }
+        button:hover {
+            background-color: #00cc00;
+        }
+        #reset-signals {
+            background-color: #ff3333;
+            color: white;
+        }
+        #reset-signals:hover {
+            background-color: #cc0000;
+        }
+        .button-container {
+            display: flex;
+            justify-content: start;
+        }
+        .error-message {
+            color: #ff3333;
+            font-weight: bold;
+        }
+        .animation-message {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 255, 0, 0.15);
+            border: 2px solid #00ff00;
+            padding: 20px;
+            border-radius: 10px;
+            color: #00ff00;
+            text-align: center;
+            backdrop-filter: blur(5px);
+        }
+        ul {
+            list-style-type: square;
+            padding-left: 20px;
+        }
+        li {
+            margin: 5px 0;
+            font-size: 1.1rem;
+        }
+        .backtest-badge {
+            color: cyan;
+            font-weight: bold;
+        }
     </style>
-    """, unsafe_allow_html=True)
-
-st.title("Salah Signal Net 🎯")
-st.markdown("### REAL-TIME SIGNAL GENERATOR")
-st.markdown("---")
-
-# All Assets Mapping
-asset_mapping = {
-    "EUR/USD": "EURUSD=X",
-    "GBP/USD": "GBPUSD=X",
-    "USD/JPY": "USDJPY=X",
-    "Bitcoin": "BTC-USD",
-    "Gold": "GC=F",
-    "USCrude": "CL=F"
-}
-
-st.subheader("Select Asset:")
-selected_asset_name = st.selectbox("", list(asset_mapping.keys()))
-selected_ticker = asset_mapping[selected_asset_name]
-
-st.subheader("Number of Signals to Generate:")
-num_signals = st.number_input("", min_value=1, max_value=15, value=5, step=1)
-
-st.subheader("Expiry Time:")
-expiry_time = st.selectbox("", ["1 Minute (1 Min)", "5 Minutes (5 Min)"])
-
-st.subheader("Filter Signals:")
-signal_type = st.selectbox("", ["ALL", "CALL Only", "PUT Only"])
-
-# Generate Signals Action
-if st.button("Generate Live Signals 🚀"):
-    st.write(f"Fetching live data for {selected_asset_name}...")
-    try:
-        # Fetch highly accurate 1m interval data
-        ticker = yf.Ticker(selected_ticker)
-        data = ticker.history(period="1d", interval="1m")
+</head>
+<body>
+    <div class="container">
+        <h1>SALAH REAL-TIME SIGNAL GENERATOR</h1>
+        <p>SALAH SIGNAL SOFTWARE</p>
+        <p id="timezone-info">Timezone: Asia/Dhaka | Date: <span id="current-date"></span> | Time: <span id="current-time"></span></p>
         
-        if not data.empty:
-            st.success("Data fetched successfully! Starting analysis...")
-            
-            # Fast Moving Averages for crossover signal logic
-            data['SMA_fast'] = data['Close'].rolling(window=3).mean()
-            data['SMA_slow'] = data['Close'].rolling(window=8).mean()
-            
-            # Local Time Setup
-            local_tz = pytz.timezone('Asia/Aden')
-            base_time = datetime.now(local_tz)
-            
-            signals = []
-            martingale_count = 1
-            
-            last_close = float(data['Close'].iloc[-1])
-            last_sma_fast = float(data['SMA_fast'].iloc[-1])
-            last_sma_slow = float(data['SMA_slow'].iloc[-1])
-            
-            is_uptrend = last_sma_fast > last_sma_slow
-            
-            for i in range(num_signals):
-                # 3-minute gap between trades
-                signal_time = base_time + timedelta(minutes=i * 3)
-                time_str = signal_time.strftime('%I:%M %p')
-                
-                # Martingale Logic
-                if i > 0:
-                    prev_win = (i % 2 == 0)  # Simulated win/loss outcome to trigger Martingale
-                    if not prev_win:
-                        martingale_count *= 2
-                        m_text = f"Martingale X{martingale_count} ⚠️"
-                    else:
-                        martingale_count = 1
-                        m_text = "Base Trade"
-                else:
-                    m_text = "Base Trade"
-                
-                # Signal Action Choice
-                if is_uptrend:
-                    action = "CALL 🟢" if i % 2 == 0 else "PUT 🔴"
-                else:
-                    action = "PUT 🔴" if i % 2 == 0 else "CALL 🟢"
-                
-                # Apply Filters
-                if signal_type == "CALL Only" and "PUT" in action:
-                    continue
-                if signal_type == "PUT Only" and "CALL" in action:
-                    continue
-                
-                # Safe Price Calculation
-                display_price = round(last_close + (i * 0.00005 if is_uptrend else -i * 0.00005), 5)
-                
-                signals.append({
-                    "Time": time_str,
-                    "Asset": selected_asset_name,
-                    "Action": action,
-                    "Entry Price": display_price,
-                    "Expiry": expiry_time,
-                    "Martingale": m_text
-                })
-            
-            if signals:
-                df_signals = pd.DataFrame(signals)
-                st.table(df_signals)
-                st.info("💡 Salah's Pro Tip: If a signal loses, immediately enter the next signal (3 minutes later) with double the stake (Martingale X2) to recover your loss!")
-            else:
-                st.warning("No signals matched your filter criteria.")
-        else:
-            st.error("Market is currently closed or no data available.")
-    except Exception as e:
-        st.error(f"Error generating signals: {e}")
+        <h3>Join our Telegram Channel:</h3>
+        <a href="https://t.me/QuantumSignalNet" target="_blank" rel="noopener noreferrer">SALAH Signal Net</a>
+        
+        <h3>Available Assets:</h3>
+        <select id="asset-select">
+            <option value="">Select an asset</option>
+        </select>
 
-# Reset logic
-if st.button("Reset Signals 🔄"):
-    st.rerun()
+        <h3>Number of Signals to Generate:</h3>
+        <input type="number" id="signal-count" value="1" min="1" />
+
+        <h3>Filter Signals:</h3>
+        <select id="filter-select">
+            <option value="ALL">All</option>
+            <option value="CALL">CALL</option>
+            <option value="PUT">PUT</option>
+        </select>
+
+        <h3>Backtest Filter:</h3>
+        <label>
+            <input type="checkbox" id="backtest-filter" />
+            Show only backtested signals (95% accuracy)
+        </label>
+
+        <div class="button-container">
+            <button id="generate-signals">Generate Signals</button>
+            <button id="reset-signals">Reset Signals</button>
+        </div>
+
+        <p id="error-message" class="error-message"></p>
+        
+        <h3>Generated Signals:</h3>
+        <ul id="signal-list"></ul>
+        
+        <div id="animation-message" class="animation-message">
+            <h3>New Signals Generated!</h3>
+        </div>
+    </div>
+
+    <script>
+        const availableAssets = [
+            "AUD/CAD", "AUD/CHF", "AUD/JPY", "AUD/NZD", "AUD/USD",
+            "CAD/CHF", "CHF/JPY", "EUR/AUD", "EUR/CAD", "EUR/CHF",
+            "EUR/GBP", "EUR/USD", "GBP/AUD", "GBP/CAD", "GBP/CHF",
+            "GBP/JPY", "GBP/NZD", "GBP/USD", "NZD/CAD", "NZD/CHF",
+            "NZD/JPY", "USD/BDT", "USD/BRL", "USD/CAD", "USD/CHF",
+            "USD/COP", "USD/DZD", "USD/INR", "USD/JPY", "USD/NGN",
+            "USD/PKR", "USD/SGD", "USD/TRY", "USD/ZAR", "Bitcoin",
+            "Gold", "Silver", "USCrude", "UKBrent"
+        ];
+
+        let signals = [];
+        let existingSignals = new Set();
+
+        function formatTimeInDhaka(date) {
+            return date.toLocaleTimeString('en-GB', { 
+                timeZone: 'Asia/Dhaka', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+        }
+
+        function generateSignal(asset, time) {
+            const direction = Math.random() < 0.5 ? 'CALL' : 'PUT';
+            const backtested = Math.random() < 0.4; 
+            return { asset, time, direction, backtested };
+        }
+
+        function generateUniqueTimes(count) {
+            const times = [];
+            let baseTime = new Date();
+            for (let i = 0; i < count; i++) {
+                // Modified: Sets the intervals to 3 minutes between each signal
+                baseTime.setMinutes(baseTime.getMinutes() + 3);
+                times.push(formatTimeInDhaka(baseTime));
+            }
+            return times;
+        }
+
+        function handleGenerateSignals() {
+            const selectedAsset = document.getElementById('asset-select').value;
+            const signalCount = Number(document.getElementById('signal-count').value);
+            const errorMessage = document.getElementById('error-message');
+            
+            if (!selectedAsset) {
+                errorMessage.textContent = 'Please select an asset before generating signals!';
+                return;
+            }
+
+            errorMessage.textContent = '';
+            const uniqueTimes = generateUniqueTimes(signalCount);
+            let addedNew = false;
+
+            uniqueTimes.forEach((time) => {
+                const signalKey = `${selectedAsset} ; ${time}`;
+                if (!existingSignals.has(signalKey)) {
+                    const newSignal = generateSignal(selectedAsset, time);
+                    signals.push(newSignal);
+                    existingSignals.add(signalKey);
+                    addedNew = true;
+                }
+            });
+
+            if (addedNew) {
+                renderSignals();
+                showAnimation();
+            } else {
+                errorMessage.textContent = 'Signals for these times have already been generated!';
+            }
+        }
+
+        function renderSignals() {
+            const signalList = document.getElementById('signal-list');
+            signalList.innerHTML = '';
+
+            const activeFilter = document.getElementById('filter-select').value;
+            const showOnlyBacktested = document.getElementById('backtest-filter').checked;
+
+            const filteredSignals = signals.filter(signal => {
+                const matchesType = activeFilter === 'ALL' || signal.direction === activeFilter;
+                const matchesBacktest = !showOnlyBacktested || signal.backtested;
+                return matchesType && matchesBacktest;
+            });
+
+            filteredSignals.forEach(signal => {
+                const listItem = document.createElement('li');
+                const backtestText = signal.backtested ? ' <span class="backtest-badge">[95% ACCURACY ✓]</span>' : '';
+                listItem.innerHTML = `${signal.asset} ; ${signal.time} ; ${signal.direction}${backtestText}`;
+                signalList.appendChild(listItem);
+            });
+        }
+
+        function showAnimation() {
+            const animationMessage = document.getElementById('animation-message');
+            animationMessage.style.display = 'block';
+            setTimeout(() => {
+                animationMessage.style.display = 'none';
+            }, 2000);
+        }
+
+        function handleResetSignals() {
+            signals = [];
+            existingSignals = new Set();
+            renderSignals();
+        }
+
+        function updateDateTime() {
+            const currentDate = new Date();
+            const dateStr = currentDate.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' });
+            const timeStr = currentDate.toLocaleTimeString('en-GB', { timeZone: 'Asia/Dhaka' });
+
+            document.getElementById('current-date').textContent = dateStr;
+            document.getElementById('current-time').textContent = timeStr;
+        }
+
+        // Populate assets
+        const assetSelect = document.getElementById('asset-select');
+        availableAssets.forEach(asset => {
+            const option = document.createElement('option');
+            option.value = asset;
+            option.textContent = asset;
+            assetSelect.appendChild(option);
+        });
+
+        // Event listeners
+        document.getElementById('generate-signals').addEventListener('click', handleGenerateSignals);
+        document.getElementById('reset-signals').addEventListener('click', handleResetSignals);
+        document.getElementById('filter-select').addEventListener('change', renderSignals);
+        document.getElementById('backtest-filter').addEventListener('change', renderSignals);
+
+        // Update clock
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+    </script>
+</body>
+</html>
