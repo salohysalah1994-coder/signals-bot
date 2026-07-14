@@ -1,3 +1,16 @@
+import streamlit as st
+import streamlit.components.v1 as components
+
+# إعداد الصفحة لتكون بعرض كامل ومظهر احترافي
+st.set_page_config(
+    page_title="SALAH Signal Generator",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# كود الـ HTML والـ JavaScript الخاص بك
+html_code = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,10 +22,11 @@
             background-color: black;
             color: #00ff00;
             font-family: monospace;
-            padding: 20px;
+            padding: 10px;
+            margin: 0;
         }
         .container {
-            max-width: 800px;
+            max-width: 100%;
             margin: auto;
         }
         h1, h3 {
@@ -38,12 +52,14 @@
             border: 1px solid #00ff00;
             border-radius: 5px;
             font-family: monospace;
+            width: 100%;
+            box-sizing: border-box;
         }
         input[type="checkbox"] {
             accent-color: #00ff00;
         }
         button {
-            padding: 10px 20px;
+            padding: 12px 20px;
             margin: 10px 10px 10px 0;
             color: black;
             background-color: #00ff00;
@@ -52,6 +68,7 @@
             cursor: pointer;
             font-weight: bold;
             font-family: monospace;
+            font-size: 1rem;
         }
         button:hover {
             background-color: #00cc00;
@@ -84,13 +101,14 @@
             color: #00ff00;
             text-align: center;
             backdrop-filter: blur(5px);
+            z-index: 9999;
         }
         ul {
             list-style-type: square;
             padding-left: 20px;
         }
         li {
-            margin: 5px 0;
+            margin: 8px 0;
             font-size: 1.1rem;
         }
         .backtest-badge {
@@ -177,8 +195,7 @@
             const times = [];
             let baseTime = new Date();
             for (let i = 0; i < count; i++) {
-                // Modified: Sets the intervals to 3 minutes between each signal
-                baseTime.setMinutes(baseTime.getMinutes() + 3);
+                baseTime.setMinutes(baseTime.getMinutes() + 3); // صفقة كل 3 دقائق
                 times.push(formatTimeInDhaka(baseTime));
             }
             return times;
@@ -260,7 +277,6 @@
             document.getElementById('current-time').textContent = timeStr;
         }
 
-        // Populate assets
         const assetSelect = document.getElementById('asset-select');
         availableAssets.forEach(asset => {
             const option = document.createElement('option');
@@ -269,15 +285,17 @@
             assetSelect.appendChild(option);
         });
 
-        // Event listeners
         document.getElementById('generate-signals').addEventListener('click', handleGenerateSignals);
         document.getElementById('reset-signals').addEventListener('click', handleResetSignals);
         document.getElementById('filter-select').addEventListener('change', renderSignals);
         document.getElementById('backtest-filter').addEventListener('change', renderSignals);
 
-        // Update clock
         setInterval(updateDateTime, 1000);
         updateDateTime();
     </script>
 </body>
 </html>
+"""
+
+# تشغيل كود الـ HTML داخل تطبيق Streamlit بكفاءة وبدون أخطاء
+components.html(html_code, height=900, scrolling=True)
