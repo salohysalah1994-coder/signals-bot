@@ -12,7 +12,7 @@ st.markdown("""
     <style>
     .main { background-color: #000000; }
     h1, h2, h3, p, label { color: #FF69B4 !important; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    .stButton>button { background-color: #FF69B4 !important; color: #000000 !important; font-weight: bold; border-radius: 8px; width: 100%; font-size: 18px; }
+    .stButton>button { black-color: #FF69B4 !important; color: #000000 !important; font-weight: bold; border-radius: 8px; width: 100%; font-size: 18px; }
     .stSelectbox div[data-baseweb="select"] { background-color: #111111 !important; color: #FF69B4 !important; border: 1px solid #FF69B4 !important; }
     .stNumberInput div[data-baseweb="input"] { background-color: #111111 !important; color: #FF69B4 !important; border: 1px solid #FF69B4 !important; }
     input { color: #FF69B4 !important; }
@@ -55,9 +55,11 @@ if st.button("Generate Live Signals 🚀"):
     try:
         # Fetch highly accurate 1m interval data
         ticker = yf.Ticker(selected_ticker)
-        data = ticker.history(period="1d", interval="1m")
         
-        if not data.empty:
+        # التعديل الذكي هنا: نطلب آخر ساعتين فقط بفاصل دقيقة لضمان سرعة الاستجابة وعدم الحظر
+        data = ticker.history(period="2h", interval="1m")
+        
+        if not data.empty and len(data) >= 8:
             st.success("Data fetched successfully! Starting analysis...")
             
             # Fast Moving Averages for crossover signal logic
@@ -125,7 +127,7 @@ if st.button("Generate Live Signals 🚀"):
             else:
                 st.warning("No signals matched your filter criteria.")
         else:
-            st.error("Market is currently closed or no data available.")
+            st.error("Market is currently closed, or Yahoo is rate-limiting requests right now.")
     except Exception as e:
         st.error(f"Error generating signals: {e}")
 
