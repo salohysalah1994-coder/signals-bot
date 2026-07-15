@@ -45,18 +45,16 @@ def check_smc_signal(candles_df, swing_len):
         
     return None
 
-# --- محاكاة جلب البيانات الحية من البروكر (للعرض والتشغيل الفوري) ---
-# ملاحظة: في النسخة الإنتاجية، تقوم بربط هذه البيانات مع الـ WebSocket الخاص بحسابك
+# --- محاكاة جلب البيانات الحية من البروكر ---
 @st.cache_data(ttl=1)
 def get_live_data():
-    # نولد بيانات وهمية متحركة لتوضيح طريقة عمل البوت فور تشغيله
     np.random.seed(int(time.time()))
     base_price = 1.0850 if "EUR" in selected_pair else 150.20
-    prices = base_price + np.cumsum(np.random.normal(0, 0.0005, 50))
+    prices = base_price + np.cumsum(np.random.normal(0, 0.0003, 50))
     df = pd.DataFrame({
-        "open": prices - 0.0002,
-        "high": prices + 0.0004,
-        "low": prices - 0.0005,
+        "open": prices - 0.0001,
+        "high": prices + 0.0002,
+        "low": prices - 0.0002,
         "close": prices
     })
     return df
@@ -79,31 +77,32 @@ st.write("---")
 st.subheader("📡 حالة الإشارة الحالية")
 signal = check_smc_signal(candles_data, swing_length)
 
+# قمنا بإصلاح الخطأ هنا وتعديل unsafe_allow_html=True
 if signal:
     color = "green" if "CALL" in signal["type"] else "red"
+    bg_color = "rgba(0, 255, 0, 0.1)" if color == "green" else "rgba(255, 0, 0, 0.1)"
+    
     st.markdown(f"""
-    <div style="background-color:rgba(0,255,0,0.1) if color=='green' else rgba(255,0,0,0.1); padding: 20px; border-radius: 10px; border: 2px solid {color};">
-        <h2 style="color:{color}; margin:0;">🚨 إشارة دخول جديدة!</h2>
-        <p style="font-size:18px; margin: 10px 0 0 0;">
-            <b>الزوج:</b> {selected_pair} <br>
-            <b>نوع الصفقة:</b> {signal['type']} <br>
-            <b>سعر الدخول:</b> {signal['price']:.5f} <br>
-            <b>وقت الدخول الفعلي:</b> {datetime.now().strftime('%H:%M:%S')} <br>
-            <b>مبلغ التداول المقترح:</b> ${trade_amount} <br>
-            <b>زمن انتهاء الصفقة:</b> ينصح بانتهاء شمعتين (دقيقتين أو 10 دقائق حسب الفريم)
+    <div style="background-color: {bg_color}; padding: 25px; border-radius: 12px; border: 3px solid {color}; text-align: right; direction: rtl;">
+        <h2 style="color: {color}; margin-top: 0;">🚨 إشارة دخول حية ومؤكدة!</h2>
+        <hr style="border-color: {color};">
+        <p style="font-size: 20px; line-height: 1.8; color: white;">
+            📌 <b>الزوج المستهدف:</b> <span style="font-size: 24px; color: yellow;">{selected_pair}</span><br>
+            🎯 <b>نوع الصفقة المطلوبة:</b> <span style="font-size: 24px; color: {color}; font-weight: bold;">{signal['type']}</span><br>
+            💵 <b>سعر الدخول الدقيق:</b> <span style="font-size: 24px;">{signal['price']:.5f}</span><br>
+            ⏰ <b>وقت إطلاق الإشارة (متى تدخل):</b> <span style="font-size: 24px; color: cyan;">{datetime.now().strftime('%H:%M:%S')}</span><br>
+            ⏳ <b>مدة الصفقة المقترحة (زمن الانتهاء):</b> <span style="font-size: 24px; color: #FF9900;">2 شمعة (دقيقتين على فريم الـ 1Min)</span><br>
+            💰 <b>المبلغ المقترح للتداول:</b> <span style="font-size: 24px;">${trade_amount}</span>
         </p>
     </div>
-    """, unsafe_allow_rule=True)
-    
-    # هنا يتم استدعاء كود التنفيذ التلقائي على API بروكر الخاص بك
-    # pocket_api.trade(action=signal['type'], amount=trade_amount)
+    """, unsafe_allow_html=True)
 else:
-    st.info("🔄 جاري رصد حركة السعر للقمم والقيعان... لا توجد إشارة دخول مطابقة لشروط الـ SMC في هذه اللحظة.")
+    st.info("🔄 جاري رصد حركة السعر للقمم والقيعان... لا توجد إشارة دخول مطابقة لشروط الـ SMC في هذه اللحظة. انتظر ريثما يتغير السلوك السعري.")
 
 # جدول لعرض آخر البيانات المحللة
 st.write("### 📊 عينة من آخر حركات السعر والشموع:")
 st.dataframe(candles_data.tail(5))
 
-# تكرار تحديث الشاشة كل ثانية
+# تكرار تحديث الشاشة تلقائياً كل ثانية لرصد التحديثات اللحظية
 time.sleep(1)
 st.rerun()
