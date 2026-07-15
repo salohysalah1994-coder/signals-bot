@@ -14,8 +14,22 @@ st.write("يقوم هذا البوت بتحليل الأسعار مباشرة و
 st.sidebar.header("⚙️ إعدادات البوت")
 selected_pair = st.sidebar.selectbox("اختر الزوج الرسمي للتحليل:", ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD"])
 timeframe = st.sidebar.selectbox("الفريم (الوقت لانتهاء الصفقة):", ["1 MIN", "5 MIN"])
-trade_amount = st.sidebar.number_input("مبلغ الصفقة ($):", min_value=1, value=10, step=1)
+trade_amount = st.sidebar.number_input("مبلغ الصفقة الأساسية ($):", min_value=1.0, value=1.0, step=0.5)
 swing_length = st.sidebar.slider("حساسية الفلترة (Swing Length):", min_value=2, max_value=10, value=3)
+
+# --- حاسبة المضاعفات (Martingale Calculator) ---
+st.sidebar.subheader("🧮 حاسبة المضاعفات (المارتينجال)")
+payout_ratio = st.sidebar.slider("نسبة العائد في المنصة % (Payout):", min_value=50, max_value=100, value=80) / 100.0
+
+# حساب المضاعفات تلقائياً بناءً على نسبة العائد لضمان التعويض والربح
+step1 = trade_amount
+step2 = round(step1 + (step1 / payout_ratio), 2)
+step3 = round(step2 + (step2 / payout_ratio) + (step1 / payout_ratio), 2)
+
+st.sidebar.write(f"**المضاعفة 1 (الأساسية):** {step1}$")
+st.sidebar.write(f"**المضاعفة 2 (في حال خسارة الأولى):** {step2}$")
+st.sidebar.write(f"**المضاعفة 3 (في حال خسارة الثانية):** {step3}$")
+st.sidebar.warning("⚠️ لا ننصح بتجاوز المضاعفة الثالثة أبداً لحماية رأس مالك.")
 
 # --- دالة تحليل الهيكل وصيد الإشارات ---
 def check_smc_signal(candles_df, swing_len):
@@ -77,7 +91,6 @@ st.write("---")
 st.subheader("📡 حالة الإشارة الحالية")
 signal = check_smc_signal(candles_data, swing_length)
 
-# قمنا بإصلاح الخطأ هنا وتعديل unsafe_allow_html=True
 if signal:
     color = "green" if "CALL" in signal["type"] else "red"
     bg_color = "rgba(0, 255, 0, 0.1)" if color == "green" else "rgba(255, 0, 0, 0.1)"
@@ -90,19 +103,22 @@ if signal:
             📌 <b>الزوج المستهدف:</b> <span style="font-size: 24px; color: yellow;">{selected_pair}</span><br>
             🎯 <b>نوع الصفقة المطلوبة:</b> <span style="font-size: 24px; color: {color}; font-weight: bold;">{signal['type']}</span><br>
             💵 <b>سعر الدخول الدقيق:</b> <span style="font-size: 24px;">{signal['price']:.5f}</span><br>
-            ⏰ <b>وقت إطلاق الإشارة (متى تدخل):</b> <span style="font-size: 24px; color: cyan;">{datetime.now().strftime('%H:%M:%S')}</span><br>
-            ⏳ <b>مدة الصفقة المقترحة (زمن الانتهاء):</b> <span style="font-size: 24px; color: #FF9900;">2 شمعة (دقيقتين على فريم الـ 1Min)</span><br>
-            💰 <b>المبلغ المقترح للتداول:</b> <span style="font-size: 24px;">${trade_amount}</span>
+            ⏰ <b>وقت إطلاق الإشارة:</b> <span style="font-size: 24px; color: cyan;">{datetime.now().strftime('%H:%M:%S')}</span><br>
+            ⏳ <b>مدة الصفقة (زمن الانتهاء):</b> <span style="font-size: 24px; color: #FF9900;">2 شمعة (دقيقتين)</span><br>
+            ⚠️ <b>مبالغ الدخول المقترحة في حال الخسارة:</b><br>
+            🔹 الصفقة الأولى (الأساسية): <span style="font-size: 22px; color: #00FF00;"><b>{step1}$</b></span><br>
+            🔹 الصفقة الثانية (مضاعفة 1): <span style="font-size: 22px; color: #FFFF00;"><b>{step2}$</b></span><br>
+            🔹 الصفقة الثالثة (مضاعفة 2): <span style="font-size: 22px; color: #FF0000;"><b>{step3}$</b></span>
         </p>
     </div>
     """, unsafe_allow_html=True)
 else:
-    st.info("🔄 جاري رصد حركة السعر للقمم والقيعان... لا توجد إشارة دخول مطابقة لشروط الـ SMC في هذه اللحظة. انتظر ريثما يتغير السلوك السعري.")
+    st.info("🔄 جاري رصد حركة السعر للقمم والقيعان... لا توجد إشارة دخول مطابقة لشروط الـ SMC في هذه اللحظة.")
 
 # جدول لعرض آخر البيانات المحللة
 st.write("### 📊 عينة من آخر حركات السعر والشموع:")
 st.dataframe(candles_data.tail(5))
 
-# تكرار تحديث الشاشة تلقائياً كل ثانية لرصد التحديثات اللحظية
+# تكرار تحديث الشاشة تلقائياً
 time.sleep(1)
 st.rerun()
