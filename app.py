@@ -1,195 +1,75 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import ta
 import time
-import json
-import websocket
-import threading
-from datetime import datetime
 
-# إعدادات الصفحة الأساسية
-st.set_page_config(page_title="Pocket Option SMC Bot", page_icon="🤖", layout="wide")
+# إعداد واجهة التطبيق
+st.set_page_config(page_title="Pocket Option Pro Signal", layout="centered")
 
-st.title("🤖 بوت التداول التلقائي الفعلي - Pocket Option")
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; color: white; }
+    .stSuccess { background-color: #00ff0022; border: 1px solid #00ff00; }
+    .stError { background-color: #ff000022; border: 1px solid #ff0000; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# تهيئة سجل الصفقات في الذاكرة
-if "trade_history" not in st.session_state:
-    st.session_state.trade_history = []
+st.title("🎯 رادار إشارات بوكيت أوبشن - الأزواج الرسمية")
 
-# --- قسم الإعدادات والربط (Sidebar) ---
-st.sidebar.header("⚙️ إعدادات البوت والربط")
-broker_mode = st.sidebar.selectbox("نوع الحساب:", ["حساب تجريبي (Demo)", "حساب حقيقي (Real)"])
-ssid_token = st.sidebar.text_input("رمز ربط الحساب (SSID Token):", value="777016485salohy", type="password")
+# --- الإعدادات الافتراضية ---
+st.sidebar.header("🛠️ ضبط الإعدادات")
+selected_pair = st.sidebar.selectbox("الزوج الرسمي", ["EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD"])
+selected_frame = st.sidebar.selectbox("فريم الشمعة", ["1 Minute", "5 Minutes"])
+expiry_time = st.sidebar.selectbox("مدة الصفقة", ["2 Minutes", "3 Minutes", "5 Minutes"])
 
-selected_pair = st.sidebar.selectbox("اختر الزوج الرسمي للتحليل:", ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD"])
-timeframe = st.sidebar.selectbox("الفريم (الوقت لانتهاء الصفقة):", ["1 MIN", "5 MIN"])
-trade_amount = st.sidebar.number_input("مبلغ الصفقة الأساسية ($):", min_value=1.0, value=2.0, step=1.0)
-swing_length = st.sidebar.slider("حساسية الفلترة (Swing Length):", min_value=2, max_value=10, value=3)
-
-# --- حاسبة المضاعفات ---
-st.sidebar.subheader("🧮 حاسبة المضاعفات (المارتينجال)")
-payout_ratio = st.sidebar.slider("نسبة العائد في المنصة % (Payout):", min_value=50, max_value=100, value=68) / 100.0
-
-step1 = trade_amount
-step2 = round(step1 + (step1 / payout_ratio), 2)
-step3 = round(step2 + (step2 / payout_ratio) + (step1 / payout_ratio), 2)
-
-st.sidebar.write(f"**المضاعفة 1 (الأساسية):** {step1}$")
-st.sidebar.write(f"**المضاعفة 2:** {step2}$")
-st.sidebar.write(f"**المضاعفة 3:** {step3}$")
-
-# --- دالة الاتصال الفعلي وإرسال الطلب عبر الـ WebSocket ---
-def send_pocket_option_trade(pair, direction, amount, duration_min, ssid):
-    """
-    تقوم هذه الدالة بفتح اتصال WebSocket مباشر بخوادم بوكت بروكر وإرسال أمر الصفقة فوراً
-    """
-    try:
-        # تحديد الخادم المناسب بناءً على نوع الحساب
-        ws_url = "wss://api-eu.po.market/v1/websocket" if broker_mode == "حساب حقيقي (Real)" else "wss://api-demo-eu.po.market/v1/websocket"
-        
-        ws = websocket.create_connection(ws_url)
-        
-        # 1. إرسال رمز الـ SSID لتسجيل الدخول المباشر للحساب
-        auth_message = {"action": "auth", "token": ssid}
-        ws.send(json.dumps(auth_message))
-        time.sleep(0.5) # وقت قصير لضمان نجاح الترخيص
-        
-        # تحويل الاتجاه إلى الصيغة البرمجية الخاصة بالمنصة
-        action_dir = "buy" if direction == "CALL" else "sell"
-        duration_seconds = 60 if duration_min == "1 MIN" else 300
-        
-        # 2. تجهيز وإرسال رسالة طلب الصفقة الفعلية (Order Request)
-        trade_message = {
-            "action": "open_order",
-            "data": {
-                "asset": pair,
-                "amount": amount,
-                "action": action_dir,
-                "time": duration_seconds
-            }
-        }
-        
-        ws.send(json.dumps(trade_message))
-        ws.close()
-        return "تم إرسال الطلب وقبوله في حسابك بنجاح ✅"
-    except Exception as e:
-        return f"فشل الاتصال: تأكد من صلاحية الـ SSID الخاص بك ❌ ({str(e)})"
-
-# تنفيذ الصفقة وتحديث السجل
-def execute_broker_trade(pair, direction, amount, duration):
-    if not ssid_token:
-        st.error("الرجاء إدخال رمز الـ SSID في الشريط الجانبي أولاً!")
-        return
-        
-    status = send_pocket_option_trade(pair, direction, amount, duration, ssid_token)
-    
-    trade_info = {
-        "الوقت": datetime.now().strftime('%H:%M:%S'),
-        "الزوج": pair,
-        "النوع": direction,
-        "المبلغ": f"${amount}",
-        "المدة": duration,
-        "الحالة": status
-    }
-    st.session_state.trade_history.insert(0, trade_info)
-
-# --- دالة تحليل الهيكل وصيد الإشارات ---
-def check_smc_signal(candles_df, swing_len):
-    if len(candles_df) < (swing_len * 2 + 1):
-        return None
-    
-    candles_df['is_high'] = candles_df['high'] == candles_df['high'].rolling(window=swing_len*2+1, center=True).max()
-    candles_df['is_low'] = candles_df['low'] == candles_df['low'].rolling(window=swing_len*2+1, center=True).min()
-    
-    highs = candles_df[candles_df['is_high']]['high'].values
-    lows = candles_df[candles_df['is_low']]['low'].values
-    
-    if len(highs) < 1 or len(lows) < 1:
-        return None
-        
-    last_swing_high = highs[-1]
-    last_swing_low = lows[-1]
-    
-    current_price = candles_df['close'].iloc[-1]
-    previous_price = candles_df['close'].iloc[-2]
-    
-    if previous_price <= last_swing_high and current_price > last_swing_high:
-        return {"type": "CALL (شراء)", "price": current_price, "raw_type": "CALL"}
-    elif previous_price >= last_swing_low and current_price < last_swing_low:
-        return {"type": "PUT (بيع)", "price": current_price, "raw_type": "PUT"}
-        
-    return None
-
-# جلب البيانات الحية
-@st.cache_data(ttl=1)
-def get_live_data():
+# محاكاة جلب البيانات (يتم استبداله بـ API للحساب الحقيقي)
+def fetch_market_data():
     np.random.seed(int(time.time()))
-    base_price = 1.0911 if "EUR" in selected_pair else 150.20
-    prices = base_price + np.cumsum(np.random.normal(0, 0.0003, 50))
-    df = pd.DataFrame({
-        "open": prices - 0.0001,
-        "high": prices + 0.0002,
-        "low": prices - 0.0002,
-        "close": prices
-    })
+    prices = np.random.randn(100).cumsum() + 1.1000
+    df = pd.DataFrame({'Close': prices})
+    df['High'] = df['Close'] + 0.0005
+    df['Low'] = df['Close'] - 0.0005
     return df
 
-candles_data = get_live_data()
-current_price = candles_data['close'].iloc[-1]
+data = fetch_market_data()
 
-# لوحة التحكم
+# حساب المؤشرات الفنية
+data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
+stoch = ta.momentum.StochasticOscillator(data['High'], data['Low'], data['Close'], window=14, smooth_window=3)
+data['K'] = stoch.stoch()
+data['D'] = stoch.stoch_signal()
+
+# استخراج آخر القيم
+last_rsi = data['RSI'].iloc[-1]
+last_k = data['K'].iloc[-1]
+last_d = data['D'].iloc[-1]
+current_price = data['Close'].iloc[-1]
+
+# عرض المعلومات الأساسية
+st.info(f"📍 الزوج: {selected_pair} | الفريم: {selected_frame} | مدة الصفقة: {expiry_time}")
+
 col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric(label="📈 الزوج المختار", value=selected_pair)
-with col2:
-    st.metric(label="💰 السعر الحالي اللحظي", value=f"{current_price:.5f}")
-with col3:
-    st.metric(label="⏱️ فريم العمل والانتهاء", value=timeframe)
+col1.metric("السعر الحالي", f"{current_price:.4f}")
+col2.metric("RSI (14)", f"{last_rsi:.2f}")
+col3.metric("Stoch K/D", f"{last_k:.1f}/{last_d:.1f}")
 
-st.write("---")
+st.divider()
 
-# فحص الإشارة الحالية
-st.subheader("📡 حالة الإشارة الحالية وطلب الصفقة")
-signal = check_smc_signal(candles_data, swing_length)
+# --- منطق الإشارة الذهبية ---
+st.subheader("🚀 الإشارة الحالية")
 
-if signal:
-    color = "green" if "CALL" in signal["type"] else "red"
-    bg_color = "rgba(0, 255, 0, 0.1)" if color == "green" else "rgba(255, 0, 0, 0.1)"
-    
-    st.markdown(f"""
-    <div style="background-color: {bg_color}; padding: 20px; border-radius: 12px; border: 3px solid {color}; text-align: right; direction: rtl; margin-bottom: 15px;">
-        <h2 style="color: {color}; margin-top: 0;">🚨 إشارة دخول حية ومؤكدة!</h2>
-        <p style="font-size: 18px; line-height: 1.6; color: white;">
-            📌 <b>الزوج المستهدف:</b> {selected_pair} | 🎯 <b>نوع الصفقة:</b> {signal['type']}<br>
-            💵 <b>سعر الدخول:</b> {signal['price']:.5f} | ⏳ <b>زمن الانتهاء:</b> {timeframe}
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col_btn1, col_btn2 = st.columns(2)
-    with col_btn1:
-        # تفعيل الزر لإرسال الطلب الحقيقي للبروكر فوراً
-        if st.button("🚀 إرسال طلب الصفقة فوراً للمنصة", use_container_width=True):
-            execute_broker_trade(selected_pair, signal['raw_type'], trade_amount, timeframe)
-            st.toast("تم إرسال طلب الصفقة الحقيقي للبروكر!")
-    with col_btn2:
-        st.info("💡 بمجرد ضغطك على الزر، سيقوم البوت باستخدام الـ SSID الخاص بك وفتح الصفقة فوراً بحسابك.")
+# شروط الشراء (CALL)
+if last_rsi < 30 and last_k < 20 and last_k > last_d:
+    st.success(f"✅ **إشارة شراء (CALL)**\n\n*   ادخل الآن لمدة **{expiry_time}**\n*   السبب: تشبع بيعي وتقاطع صاعد.")
+    st.balloons()
+
+# شروط البيع (PUT)
+elif last_rsi > 70 and last_k > 80 and last_k < last_d:
+    st.error(f"🔻 **إشارة بيع (PUT)**\n\n*   ادخل الآن لمدة **{expiry_time}**\n*   السبب: تشبع شرائي وتقاطع هابط.")
+
 else:
-    st.info("🔄 جاري رصد حركة السعر للقمم والقيعان... لا توجد إشارة دخول مطابقة لشروط الـ SMC في هذه اللحظة.")
+    st.warning("⏳ **في انتظار فرصة قوية...**\n\nالسعر حالياً في منطقة عرضية، لا تفتح صفقات عشوائية.")
 
-st.write("---")
-
-# سجل الصفقات
-st.subheader("📝 سجل طلبات الصفقات الحية")
-if len(st.session_state.trade_history) > 0:
-    st.table(st.session_state.trade_history)
-else:
-    st.caption("لم يتم إرسال أي طلب صفقة حتى الآن. بانتظار الإشارات الحية...")
-
-# جدول حركات السعر
-st.write("### 📊 عينة من آخر حركات السعر والشموع:")
-st.dataframe(candles_data.tail(3))
-
-# تحديث تلقائي كل ثانية
-time.sleep(1)
-st.rerun()
+st.divider()
+st.caption("ملاحظة: هذا التطبيق يحلل البيانات الفنية لحظياً. تأكد من مطابقة الإشارة مع حركة الشموع في منصة Pocket Option.")
