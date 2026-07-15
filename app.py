@@ -7,7 +7,7 @@ import datetime
 from pocketoptionapi.stable_api import PocketOption
 
 # --- إعدادات واجهة المستخدم --- #
-st.set_page_config(page_title="Quantum Signal Pro - Live Signals", layout="wide")
+st.set_page_config(page_title="Pocket Option Signal Radar - Manual Trading", layout="wide")
 
 st.markdown("""
     <style>
@@ -21,8 +21,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🚀 Quantum Signal Pro - مولد إشارات حقيقي")
-st.write("يولد إشارات تداول حية للأزواج الرسمية بناءً على استراتيجية RSI + Stochastic.")
+st.title("📡 رادار إشارات Pocket Option - للتداول اليدوي")
+st.write("هذا التطبيق يحلل السوق ويعرض لك إشارات شراء/بيع بناءً على استراتيجية RSI + Stochastic.")
 
 # --- إعدادات الاتصال بالمنصة (يجب تعديلها) --- #
 # للحصول على الـ SSID: افتح Pocket Option في المتصفح، F12 -> Application -> Cookies -> ابحث عن 'ssid'
@@ -38,7 +38,7 @@ def connect_to_pocket_option(ssid):
         api = PocketOption(ssid)
         api.connect()
         if api.check_connect():
-            st.success("✅ تم الاتصال بمنصة Pocket Option بنجاح!")
+            st.success("✅ تم الاتصال بمنصة Pocket Option بنجاح! 🟢")
             return api
         else:
             st.error("❌ فشل الاتصال بمنصة Pocket Option. تأكد من صحة الـ SSID.")
@@ -50,10 +50,10 @@ def connect_to_pocket_option(ssid):
 api = connect_to_pocket_option(SSID)
 
 # --- إعدادات الاستراتيجية من الشريط الجانبي --- #
-st.sidebar.header("🛠️ إعدادات الاستراتيجية")
+st.sidebar.header("🛠️ ضبط الإعدادات")
 selected_pair = st.sidebar.selectbox("الزوج الرسمي", ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"])
 selected_frame_str = st.sidebar.selectbox("فريم الشمعة", ["1 Minute", "5 Minutes"])
-expiry_time_str = st.sidebar.selectbox("مدة الصفقة", ["2 Minutes", "3 Minutes", "5 Minutes"])
+expiry_time_str = st.sidebar.selectbox("مدة الصفقة الموصى بها", ["2 Minutes", "3 Minutes", "5 Minutes"])
 
 # تحويل الفريم الزمني ومدة الانتهاء إلى ثوانٍ
 timeframe_seconds = 60 if selected_frame_str == "1 Minute" else 300
@@ -81,61 +81,65 @@ def fetch_live_data(api_client, pair, timeframe_sec, count=100):
         st.error(f"❌ حدث خطأ أثناء جلب البيانات: {e}")
         return None
 
-data = fetch_live_data(api, selected_pair, timeframe_seconds)
+# --- عرض الإشارات --- #
+if api:
+    data = fetch_live_data(api, selected_pair, timeframe_seconds)
 
-if data is not None and not data.empty:
-    # --- حساب المؤشرات الفنية --- #
-    data["RSI"] = ta.momentum.RSIIndicator(data["Close"], window=14).rsi()
-    stoch = ta.momentum.StochasticOscillator(data["High"], data["Low"], data["Close"], window=14, smooth_window=3)
-    data["K"] = stoch.stoch()
-    data["D"] = stoch.stoch_signal()
+    if data is not None and not data.empty:
+        # --- حساب المؤشرات الفنية --- #
+        data["RSI"] = ta.momentum.RSIIndicator(data["Close"], window=14).rsi()
+        stoch = ta.momentum.StochasticOscillator(data["High"], data["Low"], data["Close"], window=14, smooth_window=3)
+        data["K"] = stoch.stoch()
+        data["D"] = stoch.stoch_signal()
 
-    # استخراج آخر القيم
-    last_rsi = data["RSI"].iloc[-1]
-    last_k = data["K"].iloc[-1]
-    last_d = data["D"].iloc[-1]
-    current_price = data["Close"].iloc[-1]
-    current_time = datetime.datetime.now().strftime("%H:%M:%S")
+        # استخراج آخر القيم
+        last_rsi = data["RSI"].iloc[-1]
+        last_k = data["K"].iloc[-1]
+        last_d = data["D"].iloc[-1]
+        current_price = data["Close"].iloc[-1]
+        current_time = datetime.datetime.now().strftime("%H:%M:%S")
 
-    st.markdown(f"<p id=\"timezone-info\">الوقت الحالي: <span id=\"current-time\">{current_time}</span></p>", unsafe_allow_html=True)
-    st.markdown(f"### 📊 تحليل الزوج: {selected_pair}")
+        st.markdown(f"<p id=\"timezone-info\">الوقت الحالي: <span id=\"current-time\">{current_time}</span></p>", unsafe_allow_html=True)
+        st.markdown(f"### 📊 تحليل الزوج: {selected_pair}")
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("السعر الحالي", f"{current_price:.4f}")
-    col2.metric("RSI (14)", f"{last_rsi:.2f}")
-    col3.metric("Stoch K/D", f"{last_k:.1f}/{last_d:.1f}")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("السعر الحالي", f"{current_price:.4f}")
+        col2.metric("RSI (14)", f"{last_rsi:.2f}")
+        col3.metric("Stoch K/D", f"{last_k:.1f}/{last_d:.1f}")
 
-    st.divider()
+        st.divider()
 
-    # --- منطق الإشارة الذهبية --- #
-    st.subheader("🚀 الإشارة الحالية")
+        # --- منطق الإشارة الذهبية --- #
+        st.subheader("🚀 الإشارة الحالية")
 
-    signal_found = False
-    # شروط الشراء (CALL)
-    if last_rsi < 30 and last_k < 20 and last_k > last_d:
-        st.success(f"✅ **إشارة شراء (CALL)**\n\n*   **زمن الدخول:** الآن ({current_time})\n*   **مدة الصفقة الموصى بها:** **{expiry_time_str}**\n*   **السبب:** تشبع بيعي قوي (RSI < 30) وتقاطع صاعد في Stochastic في منطقة التشبع البيعي (K < 20 و K > D).")
-        st.balloons()
-        signal_found = True
+        signal_found = False
+        # شروط الشراء (CALL)
+        if last_rsi < 30 and last_k < 20 and last_k > last_d:
+            st.success(f"✅ **إشارة شراء (CALL)**\n\n*   **زمن الدخول:** الآن ({current_time})\n*   **مدة الصفقة الموصى بها:** **{expiry_time_str}**\n*   **السبب:** تشبع بيعي قوي (RSI < 30) وتقاطع صاعد في Stochastic في منطقة التشبع البيعي (K < 20 و K > D).")
+            st.balloons()
+            signal_found = True
 
-    # شروط البيع (PUT)
-    elif last_rsi > 70 and last_k > 80 and last_k < last_d:
-        st.error(f"🔻 **إشارة بيع (PUT)**\n\n*   **زمن الدخول:** الآن ({current_time})\n*   **مدة الصفقة الموصى بها:** **{expiry_time_str}**\n*   **السبب:** تشبع شرائي قوي (RSI > 70) وتقاطع هابط في Stochastic في منطقة التشبع الشرائي (K > 80 و K < D).")
-        signal_found = True
+        # شروط البيع (PUT)
+        elif last_rsi > 70 and last_k > 80 and last_k < last_d:
+            st.error(f"🔻 **إشارة بيع (PUT)**\n\n*   **زمن الدخول:** الآن ({current_time})\n*   **مدة الصفقة الموصى بها:** **{expiry_time_str}**\n*   **السبب:** تشبع شرائي قوي (RSI > 70) وتقاطع هابط في Stochastic في منطقة التشبع الشرائي (K > 80 و K < D).")
+            signal_found = True
 
-    if not signal_found:
-        st.warning("⏳ **في انتظار فرصة قوية...**\n\nالسوق حالياً في منطقة عرضية أو لا توجد إشارة واضحة. يرجى الانتظار أو تغيير الزوج/الفريم.")
+        if not signal_found:
+            st.warning("⏳ **في انتظار فرصة قوية...**\n\nالسوق حالياً في منطقة عرضية أو لا توجد إشارة واضحة. يرجى الانتظار أو تغيير الزوج/الفريم.")
 
-    st.divider()
-    st.caption("ملاحظة: هذا التطبيق يحلل البيانات الفنية لحظياً. تأكد من مطابقة الإشارة مع حركة الشموع في منصة Pocket Option. التداول ينطوي على مخاطر عالية.")
+        st.divider()
+        st.caption("ملاحظة: هذا التطبيق يحلل البيانات الفنية لحظياً. تأكد من مطابقة الإشارة مع حركة الشموع في منصة Pocket Option. التداول ينطوي على مخاطر عالية.")
 
-    # رسم بياني للسعر والمؤشرات (للمراقبة)
-    st.subheader("📈 حركة السعر والمؤشرات")
-    st.line_chart(data[["Close", "RSI", "K", "D"]])
+        # رسم بياني للسعر والمؤشرات (للمراقبة)
+        st.subheader("📈 حركة السعر والمؤشرات")
+        st.line_chart(data[["Close", "RSI", "K", "D"]])
 
-    # تحديث تلقائي للصفحة كل 10 ثوانٍ
-    time.sleep(10)
-    st.experimental_rerun()
+        # تحديث تلقائي للصفحة كل 10 ثوانٍ
+        time.sleep(10)
+        st.experimental_rerun()
 
+    else:
+        st.warning("لا يمكن جلب البيانات. يرجى التحقق من الاتصال بالإنترنت وإعدادات الـ API.")
 else:
-    st.warning("يرجى التأكد من الاتصال بالـ API وجلب البيانات.")
+    st.warning("يرجى التأكد من إدخال الـ SSID الصحيح والاتصال بمنصة Pocket Option.")
 
