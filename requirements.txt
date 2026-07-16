@@ -2,5 +2,6 @@ streamlit
 pandas
 numpy
 ta
-pocketoptionapi-fixed
+git+https://github.com/billythekid99/pocketoptionapi.git
+
 
