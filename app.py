@@ -8,7 +8,7 @@ import threading
 import websocket
 
 # ==========================================
-# أولاً: كود الـ API المطور لفتح الصفقات التلقائية
+# أولاً: كود الـ API المطور لاستقبال البث الحقيقي
 # ==========================================
 class PocketOptionAPI:
     def __init__(self, ssid):
@@ -16,6 +16,7 @@ class PocketOptionAPI:
         self.url = "wss://api-eu.po.market/socket.io/?EIO=4&transport=websocket"
         self.ws = None
         self.connected = False
+        self.ticks = [] # لتخزين الأسعار القادمة فورياً
 
     def connect(self):
         self.ws = websocket.WebSocketApp(
@@ -36,8 +37,29 @@ class PocketOptionAPI:
         auth_message = f'40{{"token":"{self.ssid}"}}'
         self.ws.send(auth_message)
 
+    def subscribe_to_asset(self, asset):
+        # الاشتراك في السعر المباشر للزوج المختار
+        if self.connected and self.ws:
+            sub_message = f'42{{"action":"subscribe","asset":"{asset}"}}'
+            try:
+                self.ws.send(sub_message)
+            except Exception:
+                pass
+
     def on_message(self, ws, message):
-        pass
+        try:
+            # تنظيف الرسائل القادمة من السوكيت وقراءة الأسعار
+            if message.startswith("42"):
+                data = json.loads(message[2:])
+                if isinstance(data, list) and len(data) > 1:
+                    price_info = data[1]
+                    if 'price' in price_info:
+                        self.ticks.append(float(price_info['price']))
+                        # الاحتفاظ بآخر 100 حركة سعر فقط للتحليل
+                        if len(self.ticks) > 100:
+                            self.ticks.pop(0)
+        except Exception:
+            pass
 
     def on_error(self, ws, error):
         pass
@@ -45,24 +67,21 @@ class PocketOptionAPI:
     def on_close(self, ws, close_status_code, close_msg):
         self.connected = False
 
-    # دالة إرسال صفقة تلقائية (الديمو افتراضي)
     def open_order(self, asset, amount, direction, duration=60):
         if not self.connected or not self.ws:
             return False
             
-        # تنسيق الأمر الخاص بمنصة Pocket Option لفتح صفقة ديمو
         order_data = {
             "action": "openOrder",
             "data": {
                 "asset": asset,
                 "amount": amount,
-                "action": direction,      # "call" للشراء أو "put" للبيع
-                "duration": duration,     # مدة الصفقة بالثواني (مثلاً 60 ثانية)
-                "isDemo": True            # True تعني حساب تجريبي ديمو (اجعلها False للحقيقي)
+                "action": direction,      # "call" (شراء) أو "put" (بيع)
+                "duration": duration,     # بالثواني
+                "isDemo": True            # ديمو (تجريبي)
             }
         }
         
-        # إرسال الأمر عبر السوكيت
         payload = f'42{json.dumps(order_data)}'
         try:
             self.ws.send(payload)
@@ -74,72 +93,73 @@ class PocketOptionAPI:
 # ثانياً: واجهة مستخدم التطبيق (Streamlit App)
 # ==========================================
 st.set_page_config(page_title="Pocket Option Auto-Trader", layout="wide")
-st.title("🤖 Pocket Option Auto-Trader (Demo)")
+st.title("🤖 Pocket Option Auto-Trader (Real-time Demo)")
 
-# جلب الرمز السري من إعدادات Secrets
 try:
     SSID = st.secrets["SSID"]
 except Exception:
     st.error("⚠️ لم يتم العثور على رمز SSID في إعدادات Secrets!")
     st.stop()
 
-# بدء الاتصال بالحساب
 @st.cache_resource
 def get_api_connection(ssid):
     api = PocketOptionAPI(ssid)
     api.connect()
+    # تأمين وقت للاتصال الأولي
+    time.sleep(2)
     return api
 
-st.info("🔄 جاري الاتصال بمنصة Pocket Option...")
+st.info("🔄 جاري الاتصال المباشر وقراءة حركة السوق...")
 api = get_api_connection(SSID)
 
 # واجهة التحكم
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("⚙️ إعدادات التداول الآلي")
-    asset = st.selectbox("اختر الأصل المالي للتحليل:", ["EURUSD", "GBPUSD", "AUDUSD", "USDCAD"])
-    timeframe = st.selectbox("إطار التحليل الزمني:", ["1m", "5m", "15m"])
+    st.subheader("⚙️ إعدادات التداول")
+    asset = st.selectbox("اختر زوج العملات الحقيقي:", ["EURUSD", "GBPUSD", "AUDUSD", "USDCAD"])
     trade_amount = st.number_input("مبلغ الصفقة ($):", min_value=1, value=10)
-    trade_duration = st.number_input("مدة الصفقة بالثواني (مثلاً 60 لـ دقيقة):", min_value=30, value=60)
+    trade_duration = st.number_input("مدة الصفقة بالثواني:", min_value=30, value=60)
     auto_trade_enabled = st.toggle("تفعيل التداول التلقائي الفوري ⚡")
 
+# تفعيل الاشتراك بالزوج فور تحديده
+api.subscribe_to_asset(asset)
+
 with col2:
-    st.subheader("📊 حالة السوق والتحليل")
+    st.subheader("📊 حركة الأسعار المباشرة")
     status_placeholder = st.empty()
-    if api.connected:
-        status_placeholder.success("✅ متصل بالمنصة وبانتظار الإشارة لفتح الصفقة...")
+    
+    # التحقق من استقبال بيانات الأسعار الفعلية
+    if len(api.ticks) > 10:
+        status_placeholder.success(f"✅ متصل ويتم استقبال أسعار {asset} الحية بنجاح!")
     else:
-        status_placeholder.warning("⏳ جاري محاولة إعادة الاتصال...")
+        status_placeholder.warning("⏳ جاري استقبال نبضات الأسعار الأولى من المنصة (تأكد من فتح سوق العملة حالياً)...")
 
-# توليد حركات السعر وحساب المؤشرات
-df = pd.DataFrame({
-    'close': np.random.randn(100).cumsum() + 100
-})
-df['rsi'] = ta.momentum.rsi(df['close'], window=14)
-current_rsi = df['rsi'].iloc[-1]
-
-st.divider()
-st.subheader("📢 الصفقات الحالية والعمليات")
-
-# تنفيذ الصفقات تلقائياً عند تفعيل الزر وظهور الإشارة
-if auto_trade_enabled:
-    if current_rsi < 30:
-        st.success(f"🟢 تم رصد إشارة شراء (RSI: {current_rsi:.2f})")
-        # إرسال صفقة شراء (call)
-        success = api.open_order(asset, trade_amount, "call", trade_duration)
-        if success:
-            st.toast(f"🚀 تم فتح صفقة شراء بقيمة ${trade_amount} على حساب الديمو!")
-            
-    elif current_rsi > 70:
-        st.error(f"🔴 تم رصد إشارة بيع (RSI: {current_rsi:.2f})")
-        # إرسال صفقة بيع (put)
-        success = api.open_order(asset, trade_amount, "put", trade_duration)
-        if success:
-            st.toast(f"🚀 تم فتح صفقة بيع بقيمة ${trade_amount} على حساب الديمو!")
-    else:
-        st.warning(f"🟡 في مرحلة البحث والتحليل... (مؤشر RSI الحالي: {current_rsi:.2f})")
+# استخدام الأسعار الحقيقية للتحليل
+if len(api.ticks) > 15:
+    df = pd.DataFrame({'close': api.ticks})
+    df['rsi'] = ta.momentum.rsi(df['close'], window=14)
+    current_rsi = df['rsi'].iloc[-1]
+    
+    st.divider()
+    st.subheader("📢 العمليات المباشرة وإشارات السوق")
+    
+    # عرض الرسم البياني الحقيقي
+    st.line_chart(df['close'])
+    
+    if auto_trade_enabled:
+        if current_rsi < 30:
+            st.success(f"🟢 إشارة شراء حقيقية (RSI: {current_rsi:.2f})")
+            success = api.open_order(asset, trade_amount, "call", trade_duration)
+            if success:
+                st.toast("🚀 تم تنفيذ صفقة شراء (CALL) على حساب الديمو!")
+        elif current_rsi > 70:
+            st.error(f"🔴 إشارة بيع حقيقية (RSI: {current_rsi:.2f})")
+            success = api.open_order(asset, trade_amount, "put", trade_duration)
+            if success:
+                st.toast("🚀 تم تنفيذ صفقة بيع (PUT) على حساب الديمو!")
+        else:
+            st.warning(f"🟡 نراقب السعر الحالي... مؤشر RSI في منطقة آمنة: {current_rsi:.2f}")
 else:
-    st.info("💡 التداول التلقائي مغلق حالياً. قم بتشغيل المفتاح في اليمين للتفعيل.")
-
-st.line_chart(df['close'])
+    # حماية للواجهة عند بداية التشغيل
+    st.info("💡 بانتظار تجميع ما يكفي من حركات السعر الحية لحساب المؤشرات (تستغرق عادةً 10-20 ثانية)...")
