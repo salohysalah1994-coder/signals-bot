@@ -13,7 +13,7 @@ st.title("📈 Pocket Option Signals Bot")
 try:
     SSID = st.secrets["SSID"]
 except Exception:
-    st.error("⚠️ لم يتم العثور على رمز SSID في إعدادات Secrets! يرجى إضافته أولاً.")
+    st.error("⚠️ لم يتم العثور على رمز SSID في إعدادات Secrets! يرجى إضافته أولاً في إعدادات التطبيق.")
     st.stop()
 
 # بدء الاتصال بالحساب
@@ -40,8 +40,7 @@ with col2:
     status_placeholder = st.empty()
     status_placeholder.write("⏳ جاري سحب البيانات وتحليل الاتجاه...")
 
-# محاكاة بسيطة لقراءة حركة السعر وتوليد الإشارات
-# (سيقوم البوت هنا بتحليل الشموع وعرض النتيجة على الشاشة)
+# توليد بيانات افتراضية للتحليل الفني لتفادي توقف الواجهة
 df = pd.DataFrame({
     'close': np.random.randn(100).cumsum() + 100
 })
