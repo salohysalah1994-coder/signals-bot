@@ -4,7 +4,7 @@ import numpy as np
 import ta
 import time
 import datetime
-from pocketoptionapi.stable_api import PocketOption
+from pocketoptionapi import PocketOptionAPI
 
 # --- إعدادات واجهة المستخدم --- #
 st.set_page_config(page_title="Pocket Option Signal Radar - Manual Trading", layout="wide")
