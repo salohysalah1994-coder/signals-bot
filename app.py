@@ -38,8 +38,8 @@ class PocketOptionAPI:
         self.ws.send(auth_message)
 
     def subscribe_to_asset(self, asset):
-        # الاشتراك في السعر المباشر للزوج المختار
         if self.connected and self.ws:
+            # الاشتراك في بث الأسعار الفورية للزوج
             sub_message = f'42{{"action":"subscribe","asset":"{asset}"}}'
             try:
                 self.ws.send(sub_message)
@@ -48,14 +48,12 @@ class PocketOptionAPI:
 
     def on_message(self, ws, message):
         try:
-            # تنظيف الرسائل القادمة من السوكيت وقراءة الأسعار
             if message.startswith("42"):
                 data = json.loads(message[2:])
                 if isinstance(data, list) and len(data) > 1:
                     price_info = data[1]
                     if 'price' in price_info:
                         self.ticks.append(float(price_info['price']))
-                        # الاحتفاظ بآخر 100 حركة سعر فقط للتحليل
                         if len(self.ticks) > 100:
                             self.ticks.pop(0)
         except Exception:
@@ -76,9 +74,9 @@ class PocketOptionAPI:
             "data": {
                 "asset": asset,
                 "amount": amount,
-                "action": direction,      # "call" (شراء) أو "put" (بيع)
+                "action": direction,      # "call" للشراء أو "put" للبيع
                 "duration": duration,     # بالثواني
-                "isDemo": True            # ديمو (تجريبي)
+                "isDemo": True            # حساب تجريبي ديمو
             }
         }
         
@@ -105,7 +103,6 @@ except Exception:
 def get_api_connection(ssid):
     api = PocketOptionAPI(ssid)
     api.connect()
-    # تأمين وقت للاتصال الأولي
     time.sleep(2)
     return api
 
@@ -117,34 +114,42 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("⚙️ إعدادات التداول")
-    asset = st.selectbox("اختر زوج العملات الحقيقي:", ["EURUSD", "GBPUSD", "AUDUSD", "USDCAD"])
+    # تم تحديث الخيارات لتشمل العملات العادية وأسواق الـ OTC المفتوحة دائماً
+    asset = st.selectbox("اختر زوج العملات الحقيقي:", [
+        "EURUSD_OTC", 
+        "GBPUSD_OTC", 
+        "EURUSD", 
+        "GBPUSD", 
+        "USDCAD_OTC"
+    ])
     trade_amount = st.number_input("مبلغ الصفقة ($):", min_value=1, value=10)
     trade_duration = st.number_input("مدة الصفقة بالثواني:", min_value=30, value=60)
     auto_trade_enabled = st.toggle("تفعيل التداول التلقائي الفوري ⚡")
 
-# تفعيل الاشتراك بالزوج فور تحديده
-api.subscribe_to_asset(asset)
+# إرسال طلب الاشتراك للزوج المختار فوراً
+if api.connected:
+    api.subscribe_to_asset(asset)
 
 with col2:
     st.subheader("📊 حركة الأسعار المباشرة")
     status_placeholder = st.empty()
     
-    # التحقق من استقبال بيانات الأسعار الفعلية
-    if len(api.ticks) > 10:
-        status_placeholder.success(f"✅ متصل ويتم استقبال أسعار {asset} الحية بنجاح!")
+    if len(api.ticks) > 5:
+        status_placeholder.success(f"✅ متصل ويتم استقبال أسعار {asset} الحية بنجاح! السعر الحالي: {api.ticks[-1]}")
     else:
-        status_placeholder.warning("⏳ جاري استقبال نبضات الأسعار الأولى من المنصة (تأكد من فتح سوق العملة حالياً)...")
+        status_placeholder.warning("⏳ جاري استقبال الأسعار... إذا طال الانتظار يرجى التبديل لزوج OTC آخر (مثل EURUSD_OTC).")
 
-# استخدام الأسعار الحقيقية للتحليل
+# معالجة وحساب المؤشرات
 if len(api.ticks) > 15:
     df = pd.DataFrame({'close': api.ticks})
     df['rsi'] = ta.momentum.rsi(df['close'], window=14)
+    
+    # تفادي قيم الـ NaN في البداية
+    df['rsi'] = df['rsi'].fillna(50)
     current_rsi = df['rsi'].iloc[-1]
     
     st.divider()
     st.subheader("📢 العمليات المباشرة وإشارات السوق")
-    
-    # عرض الرسم البياني الحقيقي
     st.line_chart(df['close'])
     
     if auto_trade_enabled:
@@ -161,5 +166,4 @@ if len(api.ticks) > 15:
         else:
             st.warning(f"🟡 نراقب السعر الحالي... مؤشر RSI في منطقة آمنة: {current_rsi:.2f}")
 else:
-    # حماية للواجهة عند بداية التشغيل
-    st.info("💡 بانتظار تجميع ما يكفي من حركات السعر الحية لحساب المؤشرات (تستغرق عادةً 10-20 ثانية)...")
+    st.info("💡 بانتظار تجميع الأسعار الحية لبناء الرسم البياني (تستغرق عادةً 10 ثوانٍ)...")
