@@ -1,30 +1,40 @@
-//@version=5
-indicator("Pocket Option 3M Strategy - EMA & RSI", overlay=true)
+import streamlit as st
+import pandas as pd
+import pandas_ta as ta
+import yfinance as yf
 
-// --- 1. إعدادات المؤشرات ---
-emaFastLen = input.int(9, title="سريع Fast EMA")
-emaSlowLen = input.int(21, title="بطيء Slow EMA")
-rsiLen     = input.int(14, title="فترة RSI")
+st.title("Pocket Option 3M Strategy - Signals Bot")
 
-// --- 2. حساب المؤشرات ---
-emaFast = ta.ema(close, emaFastLen)
-emaSlow = ta.ema(close, emaSlowLen)
-rsiVal  = ta.rsi(close, rsiLen)
+# اختيار الزوج والمدخلات
+symbol = st.selectbox("اختر زوج العملات:", ["EURUSD=X", "GBPUSD=X", "USDJPY=X"])
+df = yf.download(symbol, period="1d", interval="1m")
 
-// رسم المتوسطات على الرسم البياني
-plot(emaFast, title="EMA Fast (9)", color=color.green, linewidth=2)
-plot(emaSlow, title="EMA Slow (21)", color=color.red, linewidth=2)
+if not df.empty:
+    # إصلاح هيكل البيانات إذا كان MultiIndex
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
 
-// --- 3. شروط الصفقات ---
-// تقاطع EMA الأخضر فوق الأحمر + RSI أعلى من 50
-buyCondition  = ta.crossover(emaFast, emaSlow) and (rsiVal > 50)
+    # حساب المؤشرات
+    df['EMA_9'] = ta.ema(df['Close'], length=9)
+    df['EMA_21'] = ta.ema(df['Close'], length=21)
+    df['RSI_14'] = ta.rsi(df['Close'], length=14)
 
-// تقاطع EMA الأخضر تحت الأحمر + RSI أسفل من 50
-sellCondition = ta.crossunder(emaFast, emaSlow) and (rsiVal < 50)
+    # تحديد شروط الصفقات
+    df['Signal'] = "محياد"
+    
+    # شرط الشراء (CALL)
+    buy_cond = (df['EMA_9'] > df['EMA_21']) & (df['EMA_9'].shift(1) <= df['EMA_21'].shift(1)) & (df['RSI_14'] > 50)
+    # شرط البيع (PUT)
+    sell_cond = (df['EMA_9'] < df['EMA_21']) & (df['EMA_9'].shift(1) >= df['EMA_21'].shift(1)) & (df['RSI_14'] < 50)
 
-// --- 4. إشارات الصفقات على الشارت ---
-plotshape(series=buyCondition, title="إشارة شراء (CALL / HIGHER)", style=shape.triangleup, 
-          location=location.belowbar, color=color.green, size=size.small, text="CALL 3M")
+    df.loc[buy_cond, 'Signal'] = "🟢 شراء (CALL 3M)"
+    df.loc[sell_cond, 'Signal'] = "🔴 بيع (PUT 3M)"
 
-plotshape(series=sellCondition, title="إشارة بيع (PUT / LOWER)", style=shape.triangledown, 
-          location=location.abovebar, color=color.red, size=size.small, text="PUT 3M")
+    # عرض آخر شمعة والإشارة الحالية
+    latest = df.iloc[-1]
+    st.metric(label="السعر الحالي", value=f"{latest['Close']:.5f}")
+    st.subheader(f"الحالة الحالية: {latest['Signal']}")
+
+    # عرض جدول أحدث البيانات
+    st.dataframe(df[['Close', 'EMA_9', 'EMA_21', 'RSI_14', 'Signal']].tail(10))
+          
