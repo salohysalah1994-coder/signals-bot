@@ -2,21 +2,21 @@ import streamlit as st
 import yfinance as yf
 from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # إعدادات الصفحة
-st.set_page_config(page_title="Quantum Signal SOFTWARE", layout="centered")
+st.set_page_config(page_title="بوت صلاح - Salah Signals", layout="centered")
 
-# تصميم الـ CSS
+# تطبيق التنسيق باللون الأبيض والخلفية السوداء
 st.markdown("""
     <style>
     .stApp {
         background-color: #000000;
-        color: #00ff00;
+        color: #ffffff;
         font-family: 'Courier New', Courier, monospace;
     }
     h1, h2, h3, p, label, .stMarkdown {
-        color: #00ff00 !important;
+        color: #ffffff !important;
         font-family: 'Courier New', Courier, monospace !important;
     }
     .stButton>button {
@@ -28,9 +28,9 @@ st.markdown("""
         padding: 10px;
     }
     .signal-box {
-        border: 2px solid #00ff00;
+        border: 2px solid #ffffff;
         padding: 15px;
-        background-color: #051105;
+        background-color: #111111;
         border-radius: 6px;
         margin-top: 15px;
         font-size: 16px;
@@ -38,12 +38,12 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Quantum Signal SOFTWARE")
+st.title("👑 بوت صلاح للإشارات (Salah Signals)")
 st.write(f"Timezone: Local | Date & Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 st.markdown("---")
 
-# الخيارات
+# القوائم والخيارات
 asset = st.selectbox("Available Assets:", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "GBPJPY=X"])
 signal_count = st.number_input("Number of Signals to Generate:", min_value=1, max_value=5, value=1)
 filter_option = st.selectbox("Filter Signals:", ["All Signals", "Strong Signals Only"])
@@ -70,8 +70,10 @@ if st.button("Generate Signals"):
             ema9 = float(last_row['EMA_9'])
             ema21 = float(last_row['EMA_21'])
             
-            # توقيت الدخول الدقيق بالدقيقة والثانية
-            entry_time = datetime.now().strftime('%H:%M:%S')
+            # حساب بداية الدقيقة القادمة عند الثواني 00
+            now = datetime.now()
+            next_minute = (now + timedelta(minutes=1)).replace(second=0, microsecond=0)
+            entry_time = next_minute.strftime('%H:%M:00')
             
             st.markdown("### Generated Signals:")
             
@@ -86,7 +88,7 @@ if st.button("Generate Signals"):
                 st.markdown(f"""
                 <div class="signal-box">
                     📍 <b>Asset:</b> {asset}<br>
-                    ⏰ <b>Entry Time (وقت الدخول):</b> <span style="color:#ffffff;"><b>{entry_time}</b></span><br>
+                    ⏰ <b>Entry Time (وقت الدخول):</b> <span style="color:#00ffff;"><b>{entry_time} (بداية الشمعة)</b></span><br>
                     🎯 <b>Action (نوع الصفقة):</b> {action}<br>
                     ⏳ <b>Duration (زمن الصفقة):</b> <span style="color:#ffffff;"><b>3 Minutes</b></span><br>
                     📊 <b>Price:</b> {price:.5f} | <b>RSI:</b> {rsi:.1f}
