@@ -7,7 +7,7 @@ from datetime import datetime
 # إعدادات الصفحة
 st.set_page_config(page_title="Quantum Signal SOFTWARE", layout="centered")
 
-# تنسيق الـ CSS المخصص
+# تصميم الـ CSS
 st.markdown("""
     <style>
     .stApp {
@@ -28,11 +28,12 @@ st.markdown("""
         padding: 10px;
     }
     .signal-box {
-        border: 1px solid #00ff00;
+        border: 2px solid #00ff00;
         padding: 15px;
         background-color: #051105;
-        border-radius: 5px;
+        border-radius: 6px;
         margin-top: 15px;
+        font-size: 16px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -51,18 +52,14 @@ backtest = st.checkbox("Show only backtested signals (EMA + RSI Strategy)", valu
 
 if st.button("Generate Signals"):
     with st.spinner("Analyzing market data..."):
-        # جلب البيانات الحقيقية
         df = yf.download(asset, period="1d", interval="1m")
         
         if not df.empty:
-            # إصلاح مشكلة الأبعاد المتعددة لجعل البيانات 1D
             if isinstance(df.columns, tuple) or getattr(df.columns, 'nlevels', 1) > 1:
                 df.columns = df.columns.get_level_values(0)
             
-            # استخراج سعر الإغلاق كـ Series أحادي البعد
             close_prices = df['Close'].squeeze()
 
-            # حساب المؤشرات باستخدام أسعار الإغلاق أحادية البعد
             df['EMA_9'] = EMAIndicator(close=close_prices, window=9).ema_indicator()
             df['EMA_21'] = EMAIndicator(close=close_prices, window=21).ema_indicator()
             df['RSI_14'] = RSIIndicator(close=close_prices, window=14).rsi()
@@ -72,6 +69,9 @@ if st.button("Generate Signals"):
             rsi = float(last_row['RSI_14'])
             ema9 = float(last_row['EMA_9'])
             ema21 = float(last_row['EMA_21'])
+            
+            # توقيت الدخول الدقيق بالدقيقة والثانية
+            entry_time = datetime.now().strftime('%H:%M:%S')
             
             st.markdown("### Generated Signals:")
             
@@ -86,7 +86,9 @@ if st.button("Generate Signals"):
                 st.markdown(f"""
                 <div class="signal-box">
                     📍 <b>Asset:</b> {asset}<br>
-                    🎯 <b>Action:</b> {action} | <b>Duration:</b> 3 Minutes<br>
+                    ⏰ <b>Entry Time (وقت الدخول):</b> <span style="color:#ffffff;"><b>{entry_time}</b></span><br>
+                    🎯 <b>Action (نوع الصفقة):</b> {action}<br>
+                    ⏳ <b>Duration (زمن الصفقة):</b> <span style="color:#ffffff;"><b>3 Minutes</b></span><br>
                     📊 <b>Price:</b> {price:.5f} | <b>RSI:</b> {rsi:.1f}
                 </div>
                 """, unsafe_allow_html=True)
