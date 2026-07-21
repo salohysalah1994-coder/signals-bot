@@ -38,7 +38,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("👑 بوت صلاح للإشارات (Salah Signals)")
+st.title("👑  صلاح للإشارات (Salah Signals)")
 st.write(f"Timezone: Local | Date & Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 st.markdown("---")
@@ -90,7 +90,8 @@ if st.button("Generate Signals"):
                     📍 <b>Asset:</b> {asset}<br>
                     ⏰ <b>Entry Time (وقت الدخول):</b> <span style="color:#00ffff;"><b>{entry_time} (بداية الشمعة)</b></span><br>
                     🎯 <b>Action (نوع الصفقة):</b> {action}<br>
-                    ⏳ <b>Duration (زمن الصفقة):</b> <span style="color:#ffffff;"><b>3 Minutes</b></span><br>
+                    ⏳ <b>Duration (زمن الصفقة):</b> <span style="color:#ffffff;"><b>1 Minute (دقيقة واحدة)</b></span><br>
+                    🔄 <b>Martingale (المضاعفة):</b> <span style="color:#ffcc00;">مضاعفة واحدة فقط (1 Step) في الشمعة التالية عند الخسارة</span><br>
                     📊 <b>Price:</b> {price:.5f} | <b>RSI:</b> {rsi:.1f}
                 </div>
                 """, unsafe_allow_html=True)
