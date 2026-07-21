@@ -4,10 +4,10 @@ from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
 from datetime import datetime
 
-# إعدادات الصفحة لتكون بالثيم الداكن
+# إعدادات الصفحة
 st.set_page_config(page_title="Quantum Signal SOFTWARE", layout="centered")
 
-# تطبيق تنسيق الـ CSS المخصص (خلفية سوداء وخطوط خضراء)
+# تنسيق الـ CSS المخصص
 st.markdown("""
     <style>
     .stApp {
@@ -38,11 +38,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("Quantum Signal SOFTWARE")
-st.write(f" Timezone: Local | Date & Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.write(f"Timezone: Local | Date & Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 st.markdown("---")
 
-# القوائم والخيارات
+# الخيارات
 asset = st.selectbox("Available Assets:", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "GBPJPY=X"])
 signal_count = st.number_input("Number of Signals to Generate:", min_value=1, max_value=5, value=1)
 filter_option = st.selectbox("Filter Signals:", ["All Signals", "Strong Signals Only"])
@@ -55,24 +55,27 @@ if st.button("Generate Signals"):
         df = yf.download(asset, period="1d", interval="1m")
         
         if not df.empty:
-            if isinstance(df.columns, tuple):
+            # إصلاح مشكلة الأبعاد المتعددة لجعل البيانات 1D
+            if isinstance(df.columns, tuple) or getattr(df.columns, 'nlevels', 1) > 1:
                 df.columns = df.columns.get_level_values(0)
-                
-            # حساب المؤشرات
-            df['EMA_9'] = EMAIndicator(close=df['Close'], window=9).ema_indicator()
-            df['EMA_21'] = EMAIndicator(close=df['Close'], window=21).ema_indicator()
-            df['RSI_14'] = RSIIndicator(close=df['Close'], window=14).rsi()
+            
+            # استخراج سعر الإغلاق كـ Series أحادي البعد
+            close_prices = df['Close'].squeeze()
+
+            # حساب المؤشرات باستخدام أسعار الإغلاق أحادية البعد
+            df['EMA_9'] = EMAIndicator(close=close_prices, window=9).ema_indicator()
+            df['EMA_21'] = EMAIndicator(close=close_prices, window=21).ema_indicator()
+            df['RSI_14'] = RSIIndicator(close=close_prices, window=14).rsi()
 
             last_row = df.iloc[-1]
-            price = last_row['Close']
-            rsi = last_row['RSI_14']
+            price = float(last_row['Close'])
+            rsi = float(last_row['RSI_14'])
+            ema9 = float(last_row['EMA_9'])
+            ema21 = float(last_row['EMA_21'])
             
             st.markdown("### Generated Signals:")
             
-            for i in range(signal_count):
-                ema9 = last_row['EMA_9']
-                ema21 = last_row['EMA_21']
-                
+            for i in range(int(signal_count)):
                 if ema9 > ema21 and rsi > 50:
                     action = "<span style='color:#00ff00; font-weight:bold;'>CALL (BUY) ⬆️</span>"
                 elif ema9 < ema21 and rsi < 50:
