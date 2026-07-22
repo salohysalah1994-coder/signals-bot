@@ -38,13 +38,21 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("👑  صلاح للإشارات (Salah Signals)")
+st.title("👑 بوت صلاح للإشارات (Salah Signals)")
 st.write(f"Timezone: Local | Date & Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 st.markdown("---")
 
+# قائمة بجميع الأزواج الرسمية
+official_assets = [
+    "EURUSD=X", "GBPUSD=X", "USDJPY=X", "USDCHF=X", "USDCAD=X", "AUDUSD=X", "NZDUSD=X",  # الأزواج الرئيسية
+    "EURGBP=X", "EURJPY=X", "EURCHF=X", "EURAUD=X", "EURCAD=X",                           # أزواج اليورو
+    "GBPJPY=X", "GBPCHF=X", "GBPAUD=X", "GBPCAD=X",                                       # أزواج الباوند
+    "AUDJPY=X", "CADJPY=X", "CHFJPY=X", "NZDJPY=X"                                        # أزواج الين والعملات الأخرى
+]
+
 # القوائم والخيارات
-asset = st.selectbox("Available Assets:", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "GBPJPY=X"])
+asset = st.selectbox("Available Assets (الأزواج المتاحة):", official_assets)
 signal_count = st.number_input("Number of Signals to Generate:", min_value=1, max_value=5, value=1)
 filter_option = st.selectbox("Filter Signals:", ["All Signals", "Strong Signals Only"])
 
