@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import yfinance as yf
 from ta.volatility import BollingerBands
 from ta.momentum import RSIIndicator
@@ -7,7 +8,7 @@ from datetime import datetime, timedelta
 # إعدادات الصفحة
 st.set_page_config(page_title="بوت صلاح - Fox Strategy", layout="centered")
 
-# تطبيق التنسيق باللون الأبيض والخلفية السوداء
+# التنسيق والتصميم
 st.markdown("""
     <style>
     .stApp {
@@ -52,6 +53,18 @@ official_assets = [
 
 asset = st.selectbox("Available Assets (الأزواج المتاحة):", official_assets)
 
+# رابط صوت التنبيه (يمكن تغييره إن أردت)
+AUDIO_URL = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"
+
+def play_alert_sound():
+    """تشغيل صوت تنبيه عند وجود صفقة قوية"""
+    sound_html = f"""
+        <audio autoplay hidden>
+            <source src="{AUDIO_URL}" type="audio/mp3">
+        </audio>
+    """
+    components.html(sound_html, height=0)
+
 if st.button("Generate Signals (تحليل استراتيجية فوكس)"):
     with st.spinner("Analyzing market data using Fox Strategy..."):
         df = yf.download(asset, period="1d", interval="1m")
@@ -64,37 +77,40 @@ if st.button("Generate Signals (تحليل استراتيجية فوكس)"):
 
             # حساب مؤشر البولنجر باند (20, 2)
             bb = BollingerBands(close=close_prices, window=20, window_dev=2)
-            df['bb_hband'] = bb.bollinger_hband()  # الحد الأعلى
-            df['bb_lband'] = bb.bollinger_lband()  # الحد السفلي
+            df['bb_hband'] = bb.bollinger_hband()
+            df['bb_lband'] = bb.bollinger_lband()
 
             # حساب مؤشر RSI (14)
             df['RSI_14'] = RSIIndicator(close=close_prices, window=14).rsi()
 
-            # جلب آخر شمعة
             curr = df.iloc[-1]
             price = float(curr['Close'])
             rsi = float(curr['RSI_14'])
             upper_band = float(curr['bb_hband'])
             lower_band = float(curr['bb_lband'])
 
-            # شروط استراتيجية فوكس
-            # شراء: السعر لامس أو تجاوز الحد السفلي للبولنجر + RSI أقل من 35 (تشبع بيعي)
-            is_fox_buy = (price <= lower_band) and (rsi <= 35)
+            # شروط استراتيجية فوكس المعتمدة
+            is_fox_buy = (price <= lower_band * 1.0002) and (rsi <= 32)
+            is_fox_sell = (price >= upper_band * 0.9998) and (rsi >= 68)
 
-            # بيع: السعر لامس أو تجاوز الحد الأعلى للبولنجر + RSI أعلى من 65 (تشبع شرائي)
-            is_fox_sell = (price >= upper_band) and (rsi >= 65)
+            is_strong_signal = False
 
             if is_fox_buy:
                 action = "<span style='color:#00ff00; font-weight:bold;'>CALL (BUY) ⬆️</span>"
-                status_note = "🔥 إشارة فوكس شراء: تشبع بيعي حاد عند الحد السفلي للبولنجر"
+                status_note = f"🔥 إشارة فوكس شراء قوية: (RSI={rsi:.1f}) عند الحدود السفلى"
+                is_strong_signal = True
             elif is_fox_sell:
                 action = "<span style='color:#ff3333; font-weight:bold;'>PUT (SELL) ⬇️</span>"
-                status_note = "🔥 إشارة فوكس بيع: تشبع شرائي حاد عند الحد الأعلى للبولنجر"
+                status_note = f"🔥 إشارة فوكس بيع قوية: (RSI={rsi:.1f}) عند الحدود العليا"
+                is_strong_signal = True
             else:
                 action = "<span style='color:#ffff00; font-weight:bold;'>WAIT / NEUTRAL ⚪</span>"
-                status_note = "السعر في المنطقة الوسطى - لا يوجد ارتداد قوي حالياً"
+                status_note = "السعر في المنطقة الوسطى - لا توجد صفقة الآن"
 
-            # وقت الدخول في بداية الدقيقة القادمة
+            # تشغيل التنبيه الصوتي فقط في حال وجود صفقة
+            if is_strong_signal:
+                play_alert_sound()
+
             now = datetime.now()
             next_minute = (now + timedelta(minutes=1)).replace(second=0, microsecond=0)
             entry_time = next_minute.strftime('%H:%M:00')
