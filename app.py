@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 # إعدادات الصفحة
 st.set_page_config(page_title="بوت صلاح - Salah Signals", layout="centered")
 
-# تطبيق التنسيق باللون الأبيض والخلفية السوداء
 st.markdown("""
     <style>
     .stApp {
@@ -43,20 +42,15 @@ st.write(f"Timezone: Local | Date & Time: {datetime.now().strftime('%Y-%m-%d %H:
 
 st.markdown("---")
 
-# قائمة بجميع الأزواج الرسمية
 official_assets = [
-    "EURUSD=X", "GBPUSD=X", "USDJPY=X", "USDCHF=X", "USDCAD=X", "AUDUSD=X", "NZDUSD=X",  # الأزواج الرئيسية
-    "EURGBP=X", "EURJPY=X", "EURCHF=X", "EURAUD=X", "EURCAD=X",                           # أزواج اليورو
-    "GBPJPY=X", "GBPCHF=X", "GBPAUD=X", "GBPCAD=X",                                       # أزواج الباوند
-    "AUDJPY=X", "CADJPY=X", "CHFJPY=X", "NZDJPY=X"                                        # أزواج الين والعملات الأخرى
+    "EURUSD=X", "GBPUSD=X", "USDJPY=X", "USDCHF=X", "USDCAD=X", "AUDUSD=X", "NZDUSD=X",
+    "EURGBP=X", "EURJPY=X", "EURCHF=X", "EURAUD=X", "EURCAD=X",
+    "GBPJPY=X", "GBPCHF=X", "GBPAUD=X", "GBPCAD=X",
+    "AUDJPY=X", "CADJPY=X", "CHFJPY=X", "NZDJPY=X"
 ]
 
-# القوائم والخيارات
 asset = st.selectbox("Available Assets (الأزواج المتاحة):", official_assets)
-signal_count = st.number_input("Number of Signals to Generate:", min_value=1, max_value=5, value=1)
-filter_option = st.selectbox("Filter Signals:", ["All Signals", "Strong Signals Only"])
-
-backtest = st.checkbox("Show only backtested signals (EMA + RSI Strategy)", value=True)
+filter_option = st.selectbox("Filter Signals:", ["High Precision (فلترة دقيقة)", "All Signals"])
 
 if st.button("Generate Signals"):
     with st.spinner("Analyzing market data..."):
@@ -68,40 +62,49 @@ if st.button("Generate Signals"):
             
             close_prices = df['Close'].squeeze()
 
+            # حساب المؤشرات
             df['EMA_9'] = EMAIndicator(close=close_prices, window=9).ema_indicator()
             df['EMA_21'] = EMAIndicator(close=close_prices, window=21).ema_indicator()
             df['RSI_14'] = RSIIndicator(close=close_prices, window=14).rsi()
 
-            last_row = df.iloc[-1]
-            price = float(last_row['Close'])
-            rsi = float(last_row['RSI_14'])
-            ema9 = float(last_row['EMA_9'])
-            ema21 = float(last_row['EMA_21'])
+            # جلب الشمعة الحالية والشمعة السابقة لفحص التقاطع
+            curr = df.iloc[-1]
+            prev = df.iloc[-2]
+
+            price = float(curr['Close'])
+            rsi = float(curr['RSI_14'])
             
-            # حساب بداية الدقيقة القادمة عند الثواني 00
+            # فحص تقاطع الشراء: EMA9 يقطع EMA21 للأعلى
+            is_buy_cross = (prev['EMA_9'] <= prev['EMA_21']) and (curr['EMA_9'] > curr['EMA_21'])
+            # فحص تقاطع البيع: EMA9 يقطع EMA21 للأسفل
+            is_sell_cross = (prev['EMA_9'] >= prev['EMA_21']) and (curr['EMA_9'] < curr['EMA_21'])
+
+            # تحديد القرار بناءً على الفلترة
+            if is_buy_cross and rsi > 52:
+                action = "<span style='color:#00ff00; font-weight:bold;'>CALL (BUY) ⬆️</span>"
+                status_note = "تقاطع صاعد موثوق (EMA Cross + RSI > 52)"
+            elif is_sell_cross and rsi < 48:
+                action = "<span style='color:#ff3333; font-weight:bold;'>PUT (SELL) ⬇️</span>"
+                status_note = "تقاطع هابط موثوق (EMA Cross + RSI < 48)"
+            else:
+                action = "<span style='color:#ffff00; font-weight:bold;'>WAIT / NEUTRAL ⚪</span>"
+                status_note = "لا يوجد تقاطع حديث في هذه الدقيقة - انتظر الدقيقة القادمة"
+
             now = datetime.now()
             next_minute = (now + timedelta(minutes=1)).replace(second=0, microsecond=0)
             entry_time = next_minute.strftime('%H:%M:00')
-            
-            st.markdown("### Generated Signals:")
-            
-            for i in range(int(signal_count)):
-                if ema9 > ema21 and rsi > 50:
-                    action = "<span style='color:#00ff00; font-weight:bold;'>CALL (BUY) ⬆️</span>"
-                elif ema9 < ema21 and rsi < 50:
-                    action = "<span style='color:#ff3333; font-weight:bold;'>PUT (SELL) ⬇️</span>"
-                else:
-                    action = "<span style='color:#ffff00; font-weight:bold;'>WAIT / NEUTRAL ⚪</span>"
 
-                st.markdown(f"""
-                <div class="signal-box">
-                    📍 <b>Asset:</b> {asset}<br>
-                    ⏰ <b>Entry Time (وقت الدخول):</b> <span style="color:#00ffff;"><b>{entry_time} (بداية الشمعة)</b></span><br>
-                    🎯 <b>Action (نوع الصفقة):</b> {action}<br>
-                    ⏳ <b>Duration (زمن الصفقة):</b> <span style="color:#ffffff;"><b>1 Minute (دقيقة واحدة)</b></span><br>
-                    🔄 <b>Martingale (المضاعفة):</b> <span style="color:#ffcc00;">مضاعفة واحدة فقط (1 Step) في الشمعة التالية عند الخسارة</span><br>
-                    📊 <b>Price:</b> {price:.5f} | <b>RSI:</b> {rsi:.1f}
-                </div>
-                """, unsafe_allow_html=True)
+            st.markdown("### Generated Signal:")
+            st.markdown(f"""
+            <div class="signal-box">
+                📍 <b>Asset:</b> {asset}<br>
+                ⏰ <b>Entry Time (وقت الدخول):</b> <span style="color:#00ffff;"><b>{entry_time}</b></span><br>
+                🎯 <b>Action (نوع الصفقة):</b> {action}<br>
+                ⏳ <b>Duration:</b> <span style="color:#ffffff;"><b>1 Minute (دقيقة واحدة)</b></span><br>
+                🔄 <b>Martingale:</b> <span style="color:#ffcc00;">مضاعفة واحدة فقط عند الخسارة</span><br>
+                📊 <b>Price:</b> {price:.5f} | <b>RSI:</b> {rsi:.1f}<br>
+                💡 <b>Status:</b> {status_note}
+            </div>
+            """, unsafe_allow_html=True)
         else:
             st.error("Error fetching live market data.")
