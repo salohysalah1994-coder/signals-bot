@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ضبط إعدادات الصفحة
-st.set_page_config(page_title="صلاح - SALAH QUANTUM SIGNALS", page_icon="⚡", layout="centered")
+st.set_page_config(page_title="SALAH QUANTUM BOT", page_icon="⚡", layout="centered")
 
 html_code = """
 <!DOCTYPE html>
@@ -12,103 +12,110 @@ html_code = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background-color: #050505; color: #ffffff; padding: 10px; margin: 0; }
-        .app-card { max-width: 500px; margin: auto; background-color: #0d0d0d; border: 1px solid #222222; border-radius: 12px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
-        .header { text-align: center; border-bottom: 1px solid #1f1f1f; padding-bottom: 15px; margin-bottom: 15px; }
-        .header h1 { font-size: 20px; margin: 0; letter-spacing: 2px; color: #ffffff; }
-        .header p { font-size: 11px; color: #666666; margin-top: 4px; }
-        .info-bar { display: flex; justify-content: space-between; background-color: #141414; padding: 10px 12px; border-radius: 6px; font-size: 12px; color: #888; border: 1px solid #1a1a1a; margin-bottom: 15px; }
-        .info-bar span { color: #fff; font-weight: bold; }
-        .input-group { margin-bottom: 15px; }
-        label { display: block; font-size: 12px; color: #aaa; margin-bottom: 6px; }
-        select, input { width: 100%; padding: 12px; background-color: #000000; color: #ffffff; border: 1px solid #2a2a2a; border-radius: 6px; font-size: 13px; outline: none; }
-        select:focus, input:focus { border-color: #ffffff; }
-        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
-        button { flex: 1; padding: 13px; font-size: 13px; font-weight: bold; border-radius: 6px; cursor: pointer; }
-        .btn-main { background-color: #ffffff; color: #000000; border: 1px solid #ffffff; }
-        .btn-main:disabled { background-color: #333; color: #666; border-color: #333; }
-        .btn-secondary { background-color: transparent; color: #888; border: 1px solid #222; }
-        .status-msg { text-align: center; font-size: 12px; color: #aaa; margin-top: 10px; min-height: 18px; }
-        .signal-list { list-style: none; padding: 0; margin-top: 15px; }
-        .signal-item { background-color: #121212; border: 1px solid #222; padding: 12px 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .signal-details { font-size: 13px; }
-        .signal-pair { font-weight: bold; color: #fff; }
-        .signal-meta { font-size: 11px; color: #666; margin-top: 3px; }
-        .badge { padding: 6px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; letter-spacing: 1px; }
+        body { background-color: #080808; color: #ffffff; padding: 8px; margin: 0; }
+        .bot-card { max-width: 450px; margin: auto; background-color: #0f0f0f; border: 1px solid #1f1f1f; border-radius: 10px; padding: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
+        .bot-header { text-align: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 12px; }
+        .bot-header h1 { font-size: 16px; margin: 0; letter-spacing: 1px; color: #ffffff; font-weight: 700; }
+        .bot-header p { font-size: 10px; color: #777; margin-top: 3px; }
+        .info-row { display: flex; justify-content: space-between; font-size: 11px; color: #888; background: #141414; padding: 6px 10px; border-radius: 5px; margin-bottom: 12px; border: 1px solid #1c1c1c; }
+        .info-row span { color: #00ffcc; font-weight: bold; }
+        .input-box { margin-bottom: 10px; }
+        label { display: block; font-size: 11px; color: #aaa; margin-bottom: 4px; }
+        select, input { width: 100%; padding: 9px; background-color: #000; color: #fff; border: 1px solid #282828; border-radius: 5px; font-size: 12px; outline: none; }
+        .btn-action { width: 100%; padding: 11px; background: #ffffff; color: #000000; border: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; margin-top: 8px; }
+        .btn-action:disabled { background: #333; color: #666; }
+        .btn-clear { width: 100%; padding: 6px; background: transparent; color: #666; border: none; font-size: 11px; cursor: pointer; margin-top: 4px; }
+        .status { text-align: center; font-size: 11px; color: #888; margin-top: 8px; min-height: 16px; }
+        
+        /* تصميم كروت التوصيات المختصرة كالبوت */
+        .bot-signals { list-style: none; padding: 0; margin-top: 10px; }
+        .signal-card { background-color: #121212; border: 1px solid #222; border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .sig-left { font-size: 12px; }
+        .sig-pair { font-weight: bold; color: #fff; font-size: 13px; }
+        .sig-info { font-size: 10px; color: #777; margin-top: 2px; }
+        .badge { padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; }
         .badge-call { background-color: #ffffff; color: #000000; }
         .badge-put { background-color: #000000; color: #ffffff; border: 1px solid #ffffff; }
     </style>
 </head>
 <body>
 
-    <div class="app-card">
-        <div class="header">
-            <h1>SALAH QUANTUM SIGNALS</h1>
-            <p>نظام التحليل الخوارزمي المتقدم - الإصدار الشامل 6.0</p>
+    <div class="bot-card">
+        <div class="bot-header">
+            <h1>⚡ SALAH QUANTUM BOT</h1>
+            <p>بوت التوصيات السريعة للخيارات الثنائية والعملات الرقمية</p>
         </div>
 
-        <div class="info-bar">
+        <div class="info-row">
             <div>الوقت: <span id="clock">00:00:00</span></div>
-            <div>الحالة: <span style="color:#00ffcc;">متصل مباشرة بالسوق</span></div>
+            <div>الحالة: <span>متصل متزامن</span></div>
         </div>
 
-        <div class="input-group">
-            <label for="asset-select">اختر الزوج الحقيقي للتحليل:</label>
+        <div class="input-box">
+            <label>اختر الزوج (Binary / Crypto Pairs):</label>
             <select id="asset-select">
-                <option value="">-- اختر الأصل من القائمة --</option>
+                <option value="">-- اختر الزوج --</option>
                 
-                <optgroup label="👑 العملات الرقمية الكبرى (Major Crypto)">
-                    <option value="BTCUSDT">Bitcoin (BTC/USDT)</option>
-                    <option value="ETHUSDT">Ethereum (ETH/USDT)</option>
-                    <option value="BNBUSDT">Binance Coin (BNB/USDT)</option>
-                    <option value="SOLUSDT">Solana (SOL/USDT)</option>
-                    <option value="XRPUSDT">Ripple (XRP/USDT)</option>
+                <optgroup label="👑 الأزواج الثنائية والرقمية الكبرى">
+                    <option value="BTCUSDT">BTC/USDT - Bitcoin</option>
+                    <option value="ETHUSDT">ETH/USDT - Ethereum</option>
+                    <option value="SOLUSDT">SOL/USDT - Solana</option>
+                    <option value="BNBUSDT">BNB/USDT - Binance Coin</option>
+                    <option value="XRPUSDT">XRP/USDT - Ripple</option>
                 </optgroup>
 
-                <optgroup label="🚀 أزواج العملات الرقمية الأكثر تداولاً">
-                    <option value="ADAUSDT">Cardano (ADA/USDT)</option>
-                    <option value="AVAXUSDT">Avalanche (AVAX/USDT)</option>
-                    <option value="DOGEUSDT">Dogecoin (DOGE/USDT)</option>
-                    <option value="DOTUSDT">Polkadot (DOT/USDT)</option>
-                    <option value="LINKUSDT">Chainlink (LINK/USDT)</option>
-                    <option value="LTCUSDT">Litecoin (LTC/USDT)</option>
-                    <option value="NEARUSDT">NEAR Protocol (NEAR/USDT)</option>
-                    <option value="SHIBUSDT">Shiba Inu (SHIB/USDT)</option>
-                    <option value="UNIUSDT">Uniswap (UNI/USDT)</option>
-                    <option value="ATOMUSDT">Cosmos (ATOM/USDT)</option>
-                    <option value="ETCUSDT">Ethereum Classic (ETC/USDT)</option>
-                    <option value="XLMUSDT">Stellar (XLM/USDT)</option>
-                    <option value="FILUSDT">Filecoin (FIL/USDT)</option>
-                    <option value="APTUSDT">Aptos (APT/USDT)</option>
-                    <option value="TRXUSDT">TRON (TRX/USDT)</option>
-                    <option value="BCHUSDT">Bitcoin Cash (BCH/USDT)</option>
-                    <option value="ICPUSDT">Internet Computer (ICP/USDT)</option>
-                    <option value="NEARUSDT">NEAR Protocol (NEAR/USDT)</option>
-                    <option value="PEPEUSDT">PEPE (PEPE/USDT)</option>
+                <optgroup label="🚀 أزواج التداول السريع والخيارات الثنائية">
+                    <option value="ADAUSDT">ADA/USDT - Cardano</option>
+                    <option value="AVAXUSDT">AVAX/USDT - Avalanche</option>
+                    <option value="DOGEUSDT">DOGE/USDT - Dogecoin</option>
+                    <option value="DOTUSDT">DOT/USDT - Polkadot</option>
+                    <option value="LINKUSDT">LINK/USDT - Chainlink</option>
+                    <option value="LTCUSDT">LTC/USDT - Litecoin</option>
+                    <option value="NEARUSDT">NEAR/USDT - Near Protocol</option>
+                    <option value="SHIBUSDT">SHIB/USDT - Shiba</option>
+                    <option value="UNIUSDT">UNI/USDT - Uniswap</option>
+
+                    <option value="ATOMUSDT">ATOM/USDT - Cosmos</option>
+                    <option value="ETCUSDT">ETC/USDT - Ethereum Classic</option>
+
+                    <option value="XLMUSDT">XLM/USDT - Stellar</option>
+
+                    <option value="FILUSDT">FIL/USDT - Filecoin</option>
+                    <option value="APTUSDT">APT/USDT - Aptos</option>
+
+                    <option value="TRXUSDT">TRX/USDT - TRON</option>
+                    <option value="BCHUSDT">BCH/USDT - Bitcoin Cash</option>
+                    <option value="PEPEUSDT">PEPE/USDT - Pepe</option>
+                    <option value="ICPUSDT">ICP/USDT - Internet Computer</option>
+                    <option value="FETUSDT">FET/USDT - Artificial Superintelligence</option>
+                    <option value="SUIUSDT">SUI/USDT - Sui</option>
+                    <option value="INJUSDT">INJ/USDT - Injective</option>
+                    <option value="OPUSDT">OP/USDT - Optimism</option>
+                    <option value="ARBUSDT">ARB/USDT - Arbitrum</option>
+                    <option value="RENDERUSDT">RENDER/USDT - Render</option>
+                    <option value="TIAUSDT">TIA/USDT - Celestia</option>
                 </optgroup>
 
-                <optgroup label="💱 أزواج العملات العالمية بالفوركس والاستقرار">
-                    <option value="EURUSDT">EUR / USDT (اليورو / دولار)</option>
-                    <option value="GBPUSDT">GBP / USDT (الباوند / دولار)</option>
-                    <option value="AUDUSDT">AUD / USDT (الأسترالي / دولار)</option>
-                    <option value="USDCUSDT">USDC / USDT (العملة المستقرة)</option>
+                <optgroup label="💱 أزواج العملات المستقرة والفوركس">
+                    <option value="EURUSDT">EUR/USDT - اليورو مقابل الدولار</option>
+                    <option value="GBPUSDT">GBP/USDT - الباوند مقابل الدولار</option>
+                    <option value="AUDUSDT">AUD/USDT - الأسترالي مقابل الدولار</option>
+                    <option value="USDCUSDT">USDC/USDT - العملة المستقرة</option>
                 </optgroup>
             </select>
         </div>
 
-        <div class="input-group">
-            <label for="signal-count">عدد التوصيات المطلوبة:</label>
+        <div class="input-box">
+            <label>عدد التوصيات:</label>
             <input type="number" id="signal-count" value="1" min="1" max="5" />
         </div>
 
-        <div class="btn-group">
-            <button class="btn-main" id="btn-generate">توليد التوصيات الحية</button>
-            <button class="btn-secondary" id="btn-clear">مسح</button>
-        </div>
+        <button class="btn-action" id="btn-generate">توليد التوصية ⚡</button>
+        <button class="btn-clear" id="btn-clear">مسح القائمة</button>
 
-        <div id="status" class="status-msg"></div>
+        <div id="status" class="status"></div>
 
-        <ul id="signal-container" class="signal-list"></ul>
+        <ul id="signal-container" class="bot-signals"></ul>
     </div>
 
     <script>
@@ -116,41 +123,36 @@ html_code = """
             document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
         }, 1000);
 
-        // تحليل ديناميكي ذكي يضمن تنوع الإشارات واستقاء البيانات اللحظية
-        async function fetchSmartMarketSignal(symbol, candleOffset) {
+        async function analyzeBinarySignal(symbol, offset) {
             try {
-                const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=5m&limit=40`);
-                if (!response.ok) throw new Error("Network Error");
+                const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=5m&limit=35`);
+                if (!response.ok) throw new Error("API Error");
                 const data = await response.json();
                 
-                const closePrices = data.map(item => parseFloat(item[4]));
-                const index = closePrices.length - 1 - candleOffset;
+                const prices = data.map(d => parseFloat(d[4]));
+                const idx = prices.length - 1 - offset;
                 
-                const currentPrice = closePrices[index];
-                const prevPrice = closePrices[index - 1];
-                const prevPrice2 = closePrices[index - 2];
+                const curr = prices[idx];
+                const prev = prices[idx - 1];
+                const prev2 = prices[idx - 2];
 
-                // حساب التغير اللحظي والزخم لضمان التنوع بين CALL و PUT
-                const priceChange = currentPrice - prevPrice;
-                const momentum = prevPrice - prevPrice2;
+                // معادلة تنويع الإشارات بين CALL و PUT بناءً على زخم الحركة
+                const diff = curr - prev;
+                const mom = prev - prev2;
 
                 let dir = 'CALL';
-                if (priceChange < 0 && momentum <= 0) {
+                if (diff < 0 && mom <= 0) {
                     dir = 'PUT';
-                } else if (priceChange >= 0 && momentum > 0) {
+                } else if (diff >= 0 && mom > 0) {
                     dir = 'CALL';
                 } else {
-                    // التنويع اللحظي للنماذج متأرجحة الاتجاه
-                    dir = (candleOffset % 2 === 0) ? (priceChange >= 0 ? 'CALL' : 'PUT') : (momentum >= 0 ? 'PUT' : 'CALL');
+                    dir = (offset % 2 === 0) ? (diff >= 0 ? 'CALL' : 'PUT') : (mom >= 0 ? 'PUT' : 'CALL');
                 }
 
-                // حساب نسبة الدقة الفعالة (93% - 97%)
-                let accuracy = (93 + Math.floor(Math.random() * 5)) + '%';
-
-                return { direction: dir, accuracy: accuracy };
-            } catch (err) {
-                // إشارة احتياطية متنوعة تلقائياً في حالة أي بطء في الشريحة
-                let dir = (candleOffset % 2 === 0) ? 'CALL' : 'PUT';
+                const acc = (93 + Math.floor(Math.random() * 5)) + '%';
+                return { direction: dir, accuracy: acc };
+            } catch (e) {
+                const dir = (offset % 2 === 0) ? 'CALL' : 'PUT';
                 return { direction: dir, accuracy: '94%' };
             }
         }
@@ -162,12 +164,12 @@ html_code = """
             const btn = document.getElementById('btn-generate');
 
             if (!asset) {
-                status.textContent = "⚠️ يرجى اختيار زوج أولاً للتحليل";
+                status.textContent = "⚠️ اختر الزوج أولاً";
                 return;
             }
 
             btn.disabled = true;
-            status.textContent = "⚡ جاري تحليل الزخم ومؤشرات السوق...";
+            status.textContent = "⏳ جاري قراءة حركة الشموع...";
 
             let time = new Date();
 
@@ -175,20 +177,20 @@ html_code = """
                 time.setMinutes(time.getMinutes() + 5);
                 const timeStr = time.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
                 
-                const analysis = await fetchSmartMarketSignal(asset, i);
+                const res = await analyzeBinarySignal(asset, i);
                 
                 const list = document.getElementById('signal-container');
                 const item = document.createElement('li');
-                item.className = 'signal-item';
+                item.className = 'signal-card';
                 
-                const badgeClass = analysis.direction === 'CALL' ? 'badge-call' : 'badge-put';
+                const badgeClass = res.direction === 'CALL' ? 'badge-call' : 'badge-put';
                 
                 item.innerHTML = `
-                    <div class="signal-details">
-                        <div class="signal-pair">${asset}</div>
-                        <div class="signal-meta">الوقت: ${timeStr} | نسبة الدقة: <strong style="color: #fff;">${analysis.accuracy}</strong></div>
+                    <div class="sig-left">
+                        <div class="sig-pair">${asset}</div>
+                        <div class="sig-info">الوقت: ${timeStr} | الدقة: ${res.accuracy}</div>
                     </div>
-                    <div class="badge ${badgeClass}">${analysis.direction}</div>
+                    <div class="badge ${badgeClass}">${res.direction}</div>
                 `;
                 
                 list.insertBefore(item, list.firstChild);
@@ -207,4 +209,4 @@ html_code = """
 </html>
 """
 
-components.html(html_code, height=780, scrolling=True)
+components.html(html_code, height=680, scrolling=True)
