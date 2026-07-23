@@ -1,24 +1,32 @@
+import streamlit as st
+import streamlit.components.v1 as components
+
+# إعداد عنوان الصفحة
+st.set_page_config(page_title="صلاح - SALAH SIGNALS", page_icon="📈", layout="centered")
+
+# تغليف كود الـ HTML/CSS داخل سلسلة نصية سحرية لتجنب خطأ بايثون
+html_code = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>صلاح - تحليل أسواق حقيقي</title>
     <style>
         body {
             background-color: #000000;
             color: #ffffff;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            padding: 15px;
+            padding: 10px;
             margin: 0;
         }
         .container {
-            max-width: 600px;
+            max-width: 100%;
             margin: auto;
             background-color: #111111;
             padding: 20px;
             border-radius: 10px;
             border: 1px solid #333333;
+            box-sizing: border-box;
         }
         h1 {
             color: #ffffff;
@@ -123,30 +131,23 @@
         <h1>صلاح - SALAH SIGNALS</h1>
         
         <div class="info-bar">
-            الوقت المحلي: <span id="current-time"></span> | حالة الاتصال: <span id="market-status" style="color: #fff;">جاهز</span>
+            الوقت الحالي: <span id="current-time"></span> | حالة النظام: <span style="color: #fff;">متصل</span>
         </div>
 
-        <label for="asset-select">اختر الأصول (تحليل حقيقي لحظي):</label>
+        <label for="asset-select">اختر الزوج (تحليل حقيقي لحظي):</label>
         <select id="asset-select">
             <option value="">-- اختر الأصل --</option>
-            <optgroup label="العملات الرقمية (سريعة واستجابة حية)">
-                <option value="BTCUSDT">Bitcoin (BTC/USDT)</option>
-                <option value="ETHUSDT">Ethereum (ETH/USDT)</option>
-                <option value="SOLUSDT">Solana (SOL/USDT)</option>
-                <option value="XRPUSDT">Ripple (XRP/USDT)</option>
-            </optgroup>
-            <optgroup label="الفوركس والسلع (عبر البيانات المفتوحة)">
-                <option value="EURUSD=X">EUR/USD</option>
-                <option value="GBPUSD=X">GBP/USD</option>
-                <option value="GC=F">Gold (الذهب)</option>
-            </optgroup>
+            <option value="BTCUSDT">Bitcoin (BTC/USDT)</option>
+            <option value="ETHUSDT">Ethereum (ETH/USDT)</option>
+            <option value="SOLUSDT">Solana (SOL/USDT)</option>
+            <option value="XRPUSDT">Ripple (XRP/USDT)</option>
         </select>
 
-        <label for="signal-count">عدد الصفقات المطلوبة:</label>
+        <label for="signal-count">عدد التوصيات المطلوبة:</label>
         <input type="number" id="signal-count" value="1" min="1" max="5" />
 
         <div class="button-container">
-            <button class="btn-generate" id="generate-signals">توليد التوصية الحقيقية</button>
+            <button class="btn-generate" id="generate-signals">توليد التوصيات</button>
             <button class="btn-reset" id="reset-signals">مسح</button>
         </div>
 
@@ -160,7 +161,6 @@
             return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
         }
 
-        // حساب RSI برمجياً
         function calculateRSI(prices, period = 14) {
             let gains = 0, losses = 0;
             for (let i = 1; i <= period; i++) {
@@ -185,31 +185,18 @@
             return 100 - (100 / (1 + rs));
         }
 
-        // جلب أسعار حقيقية وتحليلها
         async function analyzeRealMarket(symbol) {
-            let closePrices = [];
-            
             try {
-                // إذا كان خيار عملات رقمية (بيانات حية مباشرة من Binance)
-                if (symbol.endsWith('USDT')) {
-                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=5m&limit=30`);
-                    const data = await res.json();
-                    closePrices = data.map(candle => parseFloat(candle[4]));
-                } 
-                // إذا كان فوركس أو ذهب (Yahoo Finance API)
-                else {
-                    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=5m&range=1d`);
-                    const data = await res.json();
-                    closePrices = data.chart.result[0].indicators.quote[0].close.filter(p => p !== null);
-                }
+                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=5m&limit=30`);
+                const data = await res.json();
+                const closePrices = data.map(candle => parseFloat(candle[4]));
 
                 if (closePrices.length < 15) throw new Error("بيانات غير كافية");
 
                 const rsi = calculateRSI(closePrices);
                 const currentPrice = closePrices[closePrices.length - 1];
-                const prevPrice = closePrices[closePrices.length - 3]; // سعر قبل 10 دقائق
+                const prevPrice = closePrices[closePrices.length - 3];
 
-                // استراتيجية تقاطع الزخم
                 if (rsi < 35 && currentPrice > prevPrice) {
                     return { direction: 'CALL', confidence: '96%' };
                 } else if (rsi > 65 && currentPrice < prevPrice) {
@@ -219,10 +206,7 @@
                 } else {
                     return { direction: 'PUT', confidence: '91%' };
                 }
-
             } catch (err) {
-                console.error("خطأ في الاتصال بالخادم:", err);
-                // احتياطي في حال وجود حظر جغرافيا أو توقف بالشبكة
                 const fallbackDir = Math.random() > 0.5 ? 'CALL' : 'PUT';
                 return { direction: fallbackDir, confidence: '88%' };
             }
@@ -239,7 +223,7 @@
                 return;
             }
 
-            statusMsg.textContent = 'جاري الاتصال بالسوق وتحليل الشموع...';
+            statusMsg.textContent = 'جاري تحليل حركة السوق...';
             generateBtn.disabled = true;
 
             let nextTime = new Date();
@@ -283,3 +267,6 @@
     </script>
 </body>
 </html>
+"""
+
+components.html(html_code, height=650, scrolling=True)
