@@ -33,9 +33,11 @@ html_code = """
         .sig-left { font-size: 12px; }
         .sig-pair { font-weight: bold; color: #fff; font-size: 13px; }
         .sig-info { font-size: 10px; color: #777; margin-top: 2px; }
-        .badge { padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; }
-        .badge-call { background-color: #ffffff; color: #000000; }
-        .badge-put { background-color: #000000; color: #ffffff; border: 1px solid #ffffff; }
+        
+        /* ألوان الشراء والبيع المعدلة */
+        .badge { padding: 6px 14px; border-radius: 4px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }
+        .badge-call { background-color: #00c853; color: #ffffff; box-shadow: 0 0 8px rgba(0, 200, 83, 0.4); }
+        .badge-put { background-color: #ff1744; color: #ffffff; box-shadow: 0 0 8px rgba(255, 23, 68, 0.4); }
     </style>
 </head>
 <body>
@@ -74,15 +76,11 @@ html_code = """
                     <option value="NEARUSDT">NEAR/USDT - Near Protocol</option>
                     <option value="SHIBUSDT">SHIB/USDT - Shiba</option>
                     <option value="UNIUSDT">UNI/USDT - Uniswap</option>
-
                     <option value="ATOMUSDT">ATOM/USDT - Cosmos</option>
                     <option value="ETCUSDT">ETC/USDT - Ethereum Classic</option>
-
                     <option value="XLMUSDT">XLM/USDT - Stellar</option>
-
                     <option value="FILUSDT">FIL/USDT - Filecoin</option>
                     <option value="APTUSDT">APT/USDT - Aptos</option>
-
                     <option value="TRXUSDT">TRX/USDT - TRON</option>
                     <option value="BCHUSDT">BCH/USDT - Bitcoin Cash</option>
                     <option value="PEPEUSDT">PEPE/USDT - Pepe</option>
@@ -136,7 +134,6 @@ html_code = """
                 const prev = prices[idx - 1];
                 const prev2 = prices[idx - 2];
 
-                // معادلة تنويع الإشارات بين CALL و PUT بناءً على زخم الحركة
                 const diff = curr - prev;
                 const mom = prev - prev2;
 
