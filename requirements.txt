@@ -1,3 +1,4 @@
 streamlit
-yfinance
 pandas
+yfinance
+git+https://github.com/Mathminds/tvdatafeed.git
