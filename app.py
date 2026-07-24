@@ -77,9 +77,9 @@ def get_signals():
                          (df['EMA40'] < df['EMA45']) & (df['EMA45'] < df['EMA50']) & \
                          (df['EMA50'] < df['EMA60'])
 
-        # إشارات الشراء والبيع (ظهور تقاطع جديد)
-        df['Buy_Signal'] = (~df['colslowL'].shift(1).fillna(False)) & df['colslowL']
-        df['Sell_Signal'] = (~df['colslowS'].shift(1).fillna(False)) & df['colslowS']
+        # الإشارات مستمرة طالما الاتجاه مرتب وقوي بدلاً من الاكتفاء برفة التقاطع الأولى
+        df['Buy_Signal'] = df['colslowL']
+        df['Sell_Signal'] = df['colslowS']
 
         return df, None
     except Exception as e:
@@ -115,18 +115,18 @@ else:
 
     # مربع إشارة التداول المباشرة
     if latest['Buy_Signal']:
-        st.success(f"🚨 **إشارة شراء الآن (CALL / BUY) على {selected_pair_name.split(' ')[0]}!** - مدة الصفقة: 1-3 دقائق.")
+        st.success(f"🚀 **منطقة شراء صريحة (CALL / BUY) على {selected_pair_name.split(' ')[0]}!** - مدة الصفقة المقترحة: 1-3 دقائق.")
     elif latest['Sell_Signal']:
-        st.error(f"🚨 **إشارة بيع الآن (PUT / SELL) على {selected_pair_name.split(' ')[0]}!** - مدة الصفقة: 1-3 دقائق.")
+        st.error(f"🔻 **منطقة بيع صريحة (PUT / SELL) على {selected_pair_name.split(' ')[0]}!** - مدة الصفقة المقترحة: 1-3 دقائق.")
     else:
-        st.info("⏳ لا توجد إشارة دخول جديدة على الشمعة الحالية. اضغط زر التحديث أو اختر زوجاً آخر من القائمة الجانبية.")
+        st.info("⏳ السوق في حالة تذبذب (عدم ترتيب المتوسطات). اختر زوجاً آخر من القائمة الجانبية (<<).")
 
     # جدول متابعة الشمعات والإشارات الأخيرة
     st.subheader("📋 متابعة آخر 6 شمعات")
     display_df = df[['Close', 'colslowL', 'colslowS', 'Buy_Signal', 'Sell_Signal']].tail(6)
     st.dataframe(display_df, use_container_width=True)
 
-# التحديث التلقائي التكيفي
+# التحديث التلقائي
 if auto_refresh:
     time.sleep(10)
     st.rerun()
