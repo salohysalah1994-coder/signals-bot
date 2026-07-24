@@ -7,7 +7,7 @@ import time
 st.set_page_config(page_title="TEAM7 Signal Dashboard", page_icon="⚡", layout="wide")
 
 st.title("⚡ TEAM7 Trading Signals Dashboard")
-st.caption("مؤشر إشارات التداول يدويًا لمنصة Pocket Option")
+st.caption("مؤشر إشارات التداول يدويًا لمنصة Pocket Option (إطار 5 دقائق)")
 
 # القائمة الشاملة لأزواج العملات والسلع
 PAIRS_DICT = {
@@ -36,14 +36,15 @@ PAIRS_DICT = {
     "ETH/USD (الإيثريوم)": "ETH-USD"
 }
 
-# Sidebar - التحكم بالقائمة الجانبية (افتح السهم >> في الموبايل لتغيير الزوج)
+# Sidebar - القائمة الجانبية (افتح السهم >> لتغيير الزوج)
 st.sidebar.header("⚙️ إعدادات التحكم")
 
 selected_pair_name = st.sidebar.selectbox("اختر زوج العملات:", list(PAIRS_DICT.keys()))
 symbol = PAIRS_DICT[selected_pair_name]
 
-timeframe = st.sidebar.selectbox("الإطار الزمني (Timeframe):", ["1m", "2m", "5m", "15m"], index=0)
-auto_refresh = st.sidebar.checkbox("تحديث تلقائي خلف الكواليس (كل 10 ثوانٍ)", value=True)
+# الإطار الزمني افتراضياً على 5m
+timeframe = st.sidebar.selectbox("الإطار الزمني (Timeframe):", ["5m", "1m", "15m"], index=0)
+auto_refresh = st.sidebar.checkbox("تحديث تلقائي (كل 10 ثوانٍ)", value=True)
 
 # دالة حساب EMA المباشرة عبر Pandas
 def calculate_ema(series, length):
@@ -52,15 +53,15 @@ def calculate_ema(series, length):
 # دالة جلب البيانات وحساب إشارات TEAM7
 def get_signals():
     try:
-        df = yf.download(tickers=symbol, period="1d", interval=timeframe, progress=False)
+        df = yf.download(tickers=symbol, period="5d", interval=timeframe, progress=False)
         
         if df.empty or len(df) < 60:
-            return None, "تعذر جلب البيانات لهذا الزوج حالياً، جرب زوجاً آخر أو انتظر قليلاً."
+            return None, "تعذر جلب البيانات لهذا الزوج حالياً، اختر زوجاً آخر من القائمة الجانبية."
 
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
 
-        # حساب المتوسطات الأسية الستة الخاصة بمؤشر TEAM7
+        # حساب المتوسطات الأسية الستة
         df['EMA30'] = calculate_ema(df['Close'], 30)
         df['EMA35'] = calculate_ema(df['Close'], 35)
         df['EMA40'] = calculate_ema(df['Close'], 40)
@@ -68,7 +69,7 @@ def get_signals():
         df['EMA50'] = calculate_ema(df['Close'], 50)
         df['EMA60'] = calculate_ema(df['Close'], 60)
 
-        # شروط الترتيب والاتجاه (Long & Short)
+        # شروط الترتيب والاتجاه
         df['colslowL'] = (df['EMA30'] > df['EMA35']) & (df['EMA35'] > df['EMA40']) & \
                          (df['EMA40'] > df['EMA45']) & (df['EMA45'] > df['EMA50']) & \
                          (df['EMA50'] > df['EMA60'])
@@ -77,7 +78,7 @@ def get_signals():
                          (df['EMA40'] < df['EMA45']) & (df['EMA45'] < df['EMA50']) & \
                          (df['EMA50'] < df['EMA60'])
 
-        # الإشارات مستمرة طالما الاتجاه مرتب وقوي بدلاً من الاكتفاء برفة التقاطع الأولى
+        # الإشارات
         df['Buy_Signal'] = df['colslowL']
         df['Sell_Signal'] = df['colslowS']
 
@@ -85,13 +86,13 @@ def get_signals():
     except Exception as e:
         return None, f"حدث خطأ أثناء الاتصال بالبيانات: {str(e)}"
 
-# زر التحديث الصريح والمباشر في واجهة التطبيق
+# زر التحديث المباشر
 if st.button("🔄 فحص وتحديث الإشارة الآن", use_container_width=True, type="primary"):
     st.rerun()
 
 st.markdown("---")
 
-# تنفيذ فحص المؤشر
+# تنفيذ الفحص
 df, error = get_signals()
 
 if error:
@@ -109,20 +110,20 @@ else:
     elif latest['colslowS']:
         status = "🔴 اتجاه هابط قوي (SELL Zone)"
     
-    col3.metric("حالة المؤشر", status)
+    col3.metric("حالة المؤشر (5M)", status)
 
     st.markdown("---")
 
-    # مربع إشارة التداول المباشرة
+    # تنبيه الصفقة المحددة بـ 5 دقائق
     if latest['Buy_Signal']:
-        st.success(f"🚀 **منطقة شراء صريحة (CALL / BUY) على {selected_pair_name.split(' ')[0]}!** - مدة الصفقة المقترحة: 1-3 دقائق.")
+        st.success(f"🚀 **منطقة شراء صريحة (CALL / BUY) على {selected_pair_name.split(' ')[0]}!**\n\n⏱️ **مدة الصفقة في Pocket Option:** 5 دقائق بالضبط.")
     elif latest['Sell_Signal']:
-        st.error(f"🔻 **منطقة بيع صريحة (PUT / SELL) على {selected_pair_name.split(' ')[0]}!** - مدة الصفقة المقترحة: 1-3 دقائق.")
+        st.error(f"🔻 **منطقة بيع صريحة (PUT / SELL) على {selected_pair_name.split(' ')[0]}!**\n\n⏱️ **مدة الصفقة في Pocket Option:** 5 دقائق بالضبط.")
     else:
-        st.info("⏳ السوق في حالة تذبذب (عدم ترتيب المتوسطات). اختر زوجاً آخر من القائمة الجانبية (<<).")
+        st.info("⏳ السوق في حالة تذبذب حالياً. افتح القائمة الجانبية (<<) واختر زوجاً آخر.")
 
-    # جدول متابعة الشمعات والإشارات الأخيرة
-    st.subheader("📋 متابعة آخر 6 شمعات")
+    # جدول متابعة الشمعات الأخيرة
+    st.subheader("📋 متابعة آخر شمعات (فريم 5 دقائق)")
     display_df = df[['Close', 'colslowL', 'colslowS', 'Buy_Signal', 'Sell_Signal']].tail(6)
     st.dataframe(display_df, use_container_width=True)
 
