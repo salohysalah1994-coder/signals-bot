@@ -7,14 +7,13 @@ from dotenv import load_dotenv
 # تحميل المتغيرات البيئية
 load_dotenv()
 
-# دالة آمنة لجلب وقراءة المفاتيح بدون رموز عربية أو مسافات خفية
+# دالة آمنة لجلب وقراءة المفاتيح وتنظيفها من أي رموز غيرASCII لمنع خطأ latin-1
 def get_clean_secret(key):
     val = ""
     if key in st.secrets:
         val = str(st.secrets[key])
     else:
         val = str(os.getenv(key, ""))
-    # إزالة الأسطر الجديدة والمسافات والرموز التي تسبب خطأ latin-1
     return val.encode('ascii', 'ignore').decode('ascii').strip()
 
 st.set_page_config(
@@ -45,18 +44,38 @@ else:
     default_from = "So11111111111111111111111111111111111111112" # SOL
     default_to = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"   # USDC
 
-# --- OKX API Core Request Function ---
+# --- OKX API Core Request Function (محدثة لتتجاوز خطأ 50111 تلقائياً) ---
 def okx_request(endpoint, params=None):
     url = f"https://www.okx.com{endpoint}"
     
+    api_key = get_clean_secret("OKX_API_KEY")
+    passphrase = get_clean_secret("OKX_PASSPHRASE")
+    
     headers = {
-        "OK-ACCESS-KEY": get_clean_secret("OKX_API_KEY"),
-        "OK-ACCESS-PASSPHRASE": get_clean_secret("OKX_PASSPHRASE"),
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     }
+    
+    # إضافة المفاتيح فقط في حال كانت متوفرة
+    if api_key:
+        headers["OK-ACCESS-KEY"] = api_key
+    if passphrase:
+        headers["OK-ACCESS-PASSPHRASE"] = passphrase
+        
     try:
         res = requests.get(url, headers=headers, params=params, timeout=10)
-        return res.json()
+        data = res.json()
+        
+        # إذا عاد المفتاح برفض 50111، يتم المحاولة تلقائياً بدون الهيدرز الخاصة بـ Access Key
+        if data.get("code") == "50111":
+            clean_headers = {
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+            }
+            res_retry = requests.get(url, headers=clean_headers, params=params, timeout=10)
+            return res_retry.json()
+            
+        return data
     except Exception as e:
         return {"error": str(e)}
 
@@ -114,7 +133,7 @@ with tab2:
     
     if st.button("🚀 بناء بيانات الترانزاكشن (Build Swap Tx)", use_container_width=True):
         if not wallet_addr:
-            st.warning("يرجى إدخال عنوان المحفظة أولاً!")
+            st.warning("يرجى إدخل عنوان المحفظة أولاً!")
         else:
             with st.spinner("جاري إعداد صفقة التداول مع OKX Aggregator..."):
                 tx_res = build_swap_tx(chain_id, from_token, to_token, amount, wallet_addr, str(slippage))
