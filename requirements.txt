@@ -1,3 +1,6 @@
-streamlit
-yfinance
-pandas
+streamlit>=1.30.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+web3>=6.15.0
+solana>=0.30.2
+solders>=0.18.0
