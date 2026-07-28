@@ -2,20 +2,26 @@ import streamlit as st
 import requests
 import json
 import os
-import time
-import hmac
-import hashlib
-import base64
 from dotenv import load_dotenv
 
+# تحميل المتغيرات البيئية
 load_dotenv()
 
-def get_secret(key):
+# دالة آمنة لجلب وقراءة المفاتيح بدون رموز عربية أو مسافات خفية
+def get_clean_secret(key):
+    val = ""
     if key in st.secrets:
-        return st.secrets[key]
-    return os.getenv(key, "")
+        val = str(st.secrets[key])
+    else:
+        val = str(os.getenv(key, ""))
+    # إزالة الأسطر الجديدة والمسافات والرموز التي تسبب خطأ latin-1
+    return val.encode('ascii', 'ignore').decode('ascii').strip()
 
-st.set_page_config(page_title="OKX Web3 DEX Trading Bot", page_icon="🤖", layout="wide")
+st.set_page_config(
+    page_title="OKX Web3 DEX Trading Bot", 
+    page_icon="🤖", 
+    layout="wide"
+)
 
 st.title("🤖 OKX Web3 DEX Trading Bot")
 st.caption("نظام التداول والربط التلقائي عبر OKX DEX Aggregator")
@@ -24,7 +30,7 @@ st.caption("نظام التداول والربط التلقائي عبر OKX DEX
 st.sidebar.header("⚙️ إعدادات الحساب والشبكة")
 network = st.sidebar.selectbox("اختر الشبكة المستهدفة", ["BNB Chain (56)", "Solana (501)"])
 
-api_key = get_secret("OKX_API_KEY")
+api_key = get_clean_secret("OKX_API_KEY")
 if not api_key:
     st.sidebar.warning("⚠️ لم يتم ضبط مفاتيح Secrets بعد في Streamlit!")
 else:
@@ -39,12 +45,13 @@ else:
     default_from = "So11111111111111111111111111111111111111112" # SOL
     default_to = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"   # USDC
 
-# --- OKX API Functions ---
+# --- OKX API Core Request Function ---
 def okx_request(endpoint, params=None):
     url = f"https://www.okx.com{endpoint}"
+    
     headers = {
-        "OK-ACCESS-KEY": get_secret("OKX_API_KEY"),
-        "OK-ACCESS-PASSPHRASE": get_secret("OKX_PASSPHRASE"),
+        "OK-ACCESS-KEY": get_clean_secret("OKX_API_KEY"),
+        "OK-ACCESS-PASSPHRASE": get_clean_secret("OKX_PASSPHRASE"),
         "Content-Type": "application/json"
     }
     try:
@@ -117,4 +124,3 @@ with tab2:
                 else:
                     st.error("خطأ في إعداد المعاملة:")
                     st.json(tx_res)
-                    
