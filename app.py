@@ -10,22 +10,51 @@ from datetime import datetime, timedelta
 # 1. إعدادات الصفحة
 # ==========================================
 st.set_page_config(
-    page_title="روبوت الإشارات الفورية - التوقيت المباشر",
+    page_title="روبوت الإشارات الفورية - جميع الأزواج والذهب",
     page_icon="⚡",
     layout="wide"
 )
 
-st.title("⚡ روبوت الإشارات الفورية (مع توقيت الدخول الدقيق)")
+st.title("⚡ روبوت الإشارات الفورية (جميع الأزواج والذهب)")
 st.markdown("---")
 
 # ==========================================
-# 2. القائمة الجانبية والإعدادات
+# 2. قائمة الأزواج والعملات الرسمية + الذهب
 # ==========================================
-st.sidebar.header("⚙️ إعدادات الحساب والزوج")
+FOREX_PAIRS = [
+    # الذهب
+    "XAU/USD",
+    # الأزواج الرئيسية (Majors)
+    "EUR/USD",
+    "GBP/USD",
+    "USD/JPY",
+    "USD/CHF",
+    "AUD/USD",
+    "USD/CAD",
+    "NZD/USD",
+    # الأزواج التقاطعية والفرعية (Crosses)
+    "EUR/GBP",
+    "EUR/JPY",
+    "GBP/JPY",
+    "EUR/AUD",
+    "EUR/CAD",
+    "GBP/CAD",
+    "AUD/JPY",
+    "CAD/JPY",
+    "NZD/JPY",
+    "GBP/AUD",
+    "AUD/CAD"
+]
 
-API_KEY = st.sidebar.text_input("مفتاح Twelve Data API Key:", value="demo", type="password")
-SYMBOL = st.sidebar.text_input("رمز الزوج (مثل EUR/USD):", value="EUR/USD")
+# ==========================================
+# 3. القائمة الجانبية والإعدادات
+# ==========================================
+st.sidebar.header("⚙️ إعدادات الزوج والحساب")
+
+# القائمة المنسدلة لاختيار الزوج أو الذهب
+SYMBOL = st.sidebar.selectbox("اختر الزوج / الذهب:", FOREX_PAIRS, index=1)
 TIMEFRAME = st.sidebar.selectbox("الإطار الزمني (الفريم):", ["5min", "1min", "15min"], index=0)
+API_KEY = st.sidebar.text_input("مفتاح Twelve Data API Key:", value="demo", type="password")
 AUTO_REFRESH = st.sidebar.checkbox("🔄 تفعيل التحديث التلقائي كل دقيقة", value=True)
 
 # تحديد مدة الصفقة بالدقائق بناءً على الفريم
@@ -33,7 +62,7 @@ duration_map = {"1min": 1, "5min": 5, "15min": 15}
 trade_duration = duration_map.get(TIMEFRAME, 5)
 
 # ==========================================
-# 3. دالة جلب الأسعار وحساب التوقيت
+# 4. دالة جلب الأسعار وحساب التوقيت
 # ==========================================
 def fetch_twelvedata(symbol, interval, api_key):
     try:
@@ -41,7 +70,7 @@ def fetch_twelvedata(symbol, interval, api_key):
         response = requests.get(url).json()
         
         if "values" not in response:
-            st.error(f"خطأ في جلب البيانات: {response.get('message', 'تأكد من رمز الزوج ومفتاح API')}")
+            st.error(f"خطأ في جلب بيانات ({symbol}): {response.get('message', 'تأكد من اختيار زوج يدعمه المفتاح أو ادخل مفتاح API خاص بك')}")
             return None
         
         df = pd.DataFrame(response['values'])
@@ -53,14 +82,14 @@ def fetch_twelvedata(symbol, interval, api_key):
             
         close_series = df['close']
         
-        # حساب المؤشرات
+        # حساب المؤشرات (SMA & RSI)
         sma_fast = ta.sma(close_series, length=5)
         sma_slow = ta.sma(close_series, length=34)
         df['buffer1'] = sma_fast - sma_slow
         df['buffer2'] = ta.wma(df['buffer1'], length=5)
         df['rsi'] = ta.rsi(close_series, length=14)
         
-        # تحديد الإشارات
+        # تحديد الإشارات المفلترة
         df['Signal'] = 0
         raw_buy = (df['buffer1'] > df['buffer2']) & (df['buffer1'].shift(1) <= df['buffer2'].shift(1))
         raw_sell = (df['buffer1'] < df['buffer2']) & (df['buffer1'].shift(1) >= df['buffer2'].shift(1))
@@ -74,7 +103,7 @@ def fetch_twelvedata(symbol, interval, api_key):
         return None
 
 # ==========================================
-# 4. عرض الشاشة والتوجيه الصريح
+# 5. عرض البيانات والتوجيهات على الشاشة
 # ==========================================
 data = fetch_twelvedata(SYMBOL, TIMEFRAME, API_KEY)
 
@@ -85,47 +114,47 @@ if data is not None and not data.empty:
     last_signal = latest['Signal']
     last_time = latest['datetime']
     
-    # حساب وقت الدخول للشمعة الجديدة (بداية الشمعة التالية)
+    # حساب وقت بداية الشمعة التالية بالدقيقة
     next_entry_time = last_time + timedelta(minutes=trade_duration)
     entry_time_str = next_entry_time.strftime('%H:%M:%S')
     
     col1, col2, col3 = st.columns(3)
-    col1.metric("الزوج / الفريم", f"{SYMBOL} ({TIMEFRAME})")
-    col2.metric("السعر الحي المباشر", f"{current_price:.5f}")
+    col1.metric("الرمز المختار", f"{SYMBOL} ({TIMEFRAME})")
+    col2.metric("السعر الحي المباشر", f"{current_price:.5f}" if "USD" in SYMBOL and "JPY" not in SYMBOL else f"{current_price:.2f}")
     col3.metric("مؤشر RSI", f"{current_rsi:.1f}" if pd.notnull(current_rsi) else "N/A")
     
     st.markdown("---")
     
-    # عرض تعليمات الدخول الواضحة
+    # عرض توصيات ووقت الدخول المحددة
     if last_signal == 1:
-        st.success(f"🟢 **إشارة شراء (BUY)**")
-        st.alert_tile = st.info(
-            f"🎯 **تعليمات الدخول:**\n\n"
-            f"* **وقت الدخول:** ادخل صفقة شراء **عند الدقيقة `{entry_time_str}` بالضبط** (أول ثانية من الشمعة).\n"
+        st.success(f"🟢 **إشارة شراء مفلترة (BUY) لـ {SYMBOL}**")
+        st.info(
+            f"🎯 **تعليمات الدخول الدقيقة:**\n\n"
+            f"* **توقيت الدخول:** ادخل صفقة شراء **عند الدقيقة `{entry_time_str}` بالضبط** (افتتاح الشمعة التالية).\n"
             f"* **مدة الصفقة:** اضبط المؤقت في المنصة على **`{trade_duration} دقائق`**."
         )
     elif last_signal == -1:
-        st.error(f"🔴 **إشارة بيع (SELL)**")
+        st.error(f"🔴 **إشارة بيع مفلترة (SELL) لـ {SYMBOL}**")
         st.info(
-            f"🎯 **تعليمات الدخول:**\n\n"
-            f"* **وقت الدخول:** ادخل صفقة بيع **عند الدقيقة `{entry_time_str}` بالضبط** (أول ثانية من الشمعة).\n"
+            f"🎯 **تعليمات الدخول الدقيقة:**\n\n"
+            f"* **توقيت الدخول:** ادخل صفقة بيع **عند الدقيقة `{entry_time_str}` بالضبط** (افتتاح الشمعة التالية).\n"
             f"* **مدة الصفقة:** اضبط المؤقت في المنصة على **`{trade_duration} دقائق`**."
         )
     else:
         st.warning(
-            f"⚪ **لا توجد إشارة جديدة حالياً**\n\n"
-            f"يرجى الانتظار وعدم دخول أي صفقة حتى تتغير الحالة."
+            f"⚪ **لا توجد إشارة جديدة على {SYMBOL} حالياً**\n\n"
+            f"يمكنك تغيير الزوج من القائمة الجانبية أو الانتظار حتى تتغير الإشارة."
         )
         
     st.markdown("---")
-    st.subheader("📋 سجل الإشارات المفلترة")
+    st.subheader(f"📋 سجل الإشارات الأخيرة لـ {SYMBOL}")
     signals_df = data[data['Signal'] != 0][['datetime', 'close', 'rsi', 'Signal']].tail(5)
     if not signals_df.empty:
         signals_df['نوع الإشارة'] = signals_df['Signal'].map({1: '🟢 شراء', -1: '🔴 بيع'})
         st.dataframe(signals_df[['datetime', 'close', 'rsi', 'نوع الإشارة']], use_container_width=True)
 
 # ==========================================
-# 5. التحديث التلقائي
+# 6. التحديث التلقائي
 # ==========================================
 if AUTO_REFRESH:
     time.sleep(60)
