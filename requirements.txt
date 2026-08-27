@@ -1,0 +1,7 @@
+pandas
+numpy
+yfinance
+pandas-ta
+python-dotenv
+streamlit
+requests
