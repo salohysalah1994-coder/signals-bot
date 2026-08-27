@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import pandas_ta as ta
+import time
 
 # ==========================================
 # 1. إعدادات الصفحة والتصاميم
@@ -13,7 +14,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📈 روبوت إشارات التداول الفنية")
+st.title("📈 روبوت إشارات التداول (كل 5 دقائق)")
 st.markdown("---")
 
 # ==========================================
@@ -21,8 +22,13 @@ st.markdown("---")
 # ==========================================
 st.sidebar.header("⚙️ إعدادات التحليل")
 
-SYMBOL = st.sidebar.text_input("رمز الزوج/السهم (مثل EURUSD=X أو AAPL):", value="EURUSD=X")
-TIMEFRAME = st.sidebar.selectbox("الإطار الزمني (Timeframe):", ["1d", "1h", "15m", "5m"], index=0)
+SYMBOL = st.sidebar.text_input("رمز الزوج/السهم (مثل EURUSD=X أو BTC-USD):", value="EURUSD=X")
+
+# اختيار الإطار الزمني - افتراضياً 5m
+TIMEFRAME = st.sidebar.selectbox("الإطار الزمني (Timeframe):", ["5m", "1m", "15m", "1h", "1d"], index=0)
+
+# إضافة زر تفعيل التحديث التلقائي
+AUTO_REFRESH = st.sidebar.checkbox("🔄 تفعيل التحديث التلقائي كل 5 دقائق", value=True)
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("إعدادات المؤشرات")
@@ -35,17 +41,17 @@ SIGNAL_WMA = st.sidebar.number_input("فترة إشارة WMA:", min_value=1, va
 # ==========================================
 def fetch_and_analyze_data(symbol, timeframe):
     try:
-        # جلب البيانات من yfinance
-        df = yf.download(symbol, period="1y", interval=timeframe, progress=False)
+        # تحديد فترة جلب البيانات بناءً على الفريم
+        period = "7d" if timeframe in ["1m", "5m", "15m"] else "1y"
+        
+        df = yf.download(symbol, period=period, interval=timeframe, progress=False)
         
         if df.empty:
             return None
         
-        # معالجة الأعمدة المتعددة (MultiIndex) لتعمل مع الإصدارات الحديثة من yfinance
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
             
-        # التأكد من أن عمود الإغلاق هو Series ذو بعد واحد
         close_series = df['Close'].squeeze()
         
         # 1. حساب مؤشر GO Strategy (Awesome Oscillator)
@@ -60,11 +66,9 @@ def fetch_and_analyze_data(symbol, timeframe):
         # 2. توليد إشارات التداول
         df['Signal'] = 0
         
-        # إشارة شراء (Buy Signal)
         buy_condition = (df['buffer1'] > df['buffer2']) & (df['buffer1'].shift(1) <= df['buffer2'].shift(1))
         df.loc[buy_condition, 'Signal'] = 1
         
-        # إشارة بيع (Sell Signal)
         sell_condition = (df['buffer1'] < df['buffer2']) & (df['buffer1'].shift(1) >= df['buffer2'].shift(1))
         df.loc[sell_condition, 'Signal'] = -1
         
@@ -77,40 +81,39 @@ def fetch_and_analyze_data(symbol, timeframe):
 # ==========================================
 # 4. عرض النتائج والتنبيهات
 # ==========================================
-with st.spinner('جاري جلب البيانات وتحليلها...'):
-    data = fetch_and_analyze_data(SYMBOL, TIMEFRAME)
+data = fetch_and_analyze_data(SYMBOL, TIMEFRAME)
 
 if data is None or data.empty:
-    st.error("❌ تعذر جلب البيانات. تأكد من صحة رمز الزوج (مثال: EURUSD=X أو AAPL أو BTC-USD).")
+    st.error("❌ تعذر جلب البيانات. تأكد من صحة رمز الزوج (مثال: EURUSD=X أو BTC-USD).")
 else:
-    # الحصول على أحدث شمعة وأحدث إشارة
     latest_row = data.iloc[-1]
     last_signal = latest_row['Signal']
     current_price = latest_row['Close']
     
-    # عرض ملخص السعر
     col1, col2, col3 = st.columns(3)
-    col1.metric("الرمز", SYMBOL)
+    col1.metric("الرمز / الفريم", f"{SYMBOL} ({TIMEFRAME})")
     col2.metric("السعر الحالي", f"{current_price:.4f}" if isinstance(current_price, float) else str(current_price))
     
-    # عرض حالة الإشارة الحالية
     if last_signal == 1:
-        col3.success("🟢 إشارة شراء (BUY)")
+        col3.success("🟢 إشارة شراء جديدة (BUY)")
     elif last_signal == -1:
-        col3.error("🔴 إشارة بيع (SELL)")
+        col3.error("🔴 إشارة بيع جديدة (SELL)")
     else:
-        col3.info("⚪ لا توجد إشارة جديدة (NEUTRAL)")
+        col3.info("⚪ لا توجد إشارة جديدة (محايد)")
 
     st.markdown("---")
 
-    # عرض جدول بالإشارات الأخيرة
-    st.subheader("📋 سجل أحدث الإشارات")
-    signals_df = data[data['Signal'] != 0][['Close', 'buffer1', 'buffer2', 'Signal']].tail(10)
-    
-    # تحسين عرض قيم الإشارة
+    st.subheader("📋 أحدث 5 صفقات / إشارات تم رصدها")
+    signals_df = data[data['Signal'] != 0][['Close', 'buffer1', 'buffer2', 'Signal']].tail(5)
     signals_df['نوع الإشارة'] = signals_df['Signal'].map({1: '🟢 شراء', -1: '🔴 بيع'})
-    st.dataframe(signals_df[['Close', 'buffer1', 'buffer2', 'نوع الإشارة']], use_container_width=True)
+    st.dataframe(signals_df[['Close', 'نوع الإشارة']], use_container_width=True)
 
-    # رسم البياني المؤشر
-    st.subheader("📊 الرسم البياني للمؤشر")
-    st.line_chart(data[['buffer1', 'buffer2']].tail(100))
+    st.subheader("📊 الرسم البياني للإشارة")
+    st.line_chart(data[['buffer1', 'buffer2']].tail(60))
+
+# ==========================================
+# 5. التحديث التلقائي كل 5 دقائق (300 ثانية)
+# ==========================================
+if AUTO_REFRESH:
+    time.sleep(300)
+    st.rerun()
