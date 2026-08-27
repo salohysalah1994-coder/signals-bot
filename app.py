@@ -1,92 +1,109 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
 import yfinance as yf
 import pandas_ta as ta
-import time
 
 # ==========================================
-# 1. إعدادات البوت والاستراتيجية
+# 1. إعدادات الصفحة في Streamlit
 # ==========================================
-SYMBOL = "EURUSD=X"      # الزوج المراد تداوله (أو أي زوج آخر مثل GBPUSD=X)
-TIMEFRAME = "5m"         # الفريم: 1m لصفقات دقيقتين، أو 5m لصفقات 5-15 دقيقة
-AO_FAST = 1
-AO_SLOW = 34
-SIGNAL_WMA = 5
-TREND_EMA = 200          # فلتر الاتجاه العام
-RSI_PERIOD = 14          # فلتر التشبع
+st.set_page_config(
+    page_title="GO Strategy Trading Signals",
+    page_icon="📈",
+    layout="wide"
+)
 
+st.title("📈 بوت إشارات التداول المطور (GO Strategy)")
+st.caption("مخصص لصفقات الخيارات الثنائية والأسواق المالية (2 إلى 15 دقيقة)")
 
+# ==========================================
+# 2. القائمة الجانبية للإعدادات (Sidebar)
+# ==========================================
+st.sidebar.header("⚙️ إعدادات البوت")
+
+SYMBOL = st.sidebar.text_input("رمز الزوج (Symbol)", value="EURUSD=X")
+TIMEFRAME = st.sidebar.selectbox("الفريم الزمني", ["1m", "2m", "5m", "15m"], index=2)
+
+st.sidebar.subheader("مؤشرات الاستراتيجية")
+AO_FAST = st.sidebar.number_input("AO Fast Period", value=1)
+AO_SLOW = st.sidebar.number_input("AO Slow Period", value=34)
+SIGNAL_WMA = st.sidebar.number_input("Signal WMA Period", value=5)
+TREND_EMA = st.sidebar.number_input("Trend Filter (EMA)", value=200)
+RSI_PERIOD = st.sidebar.number_input("RSI Period", value=14)
+
+# ==========================================
+# 3. دالة جلب البيانات وتحليلها
+# ==========================================
 def fetch_and_analyze_data(symbol, timeframe):
-    # جلب بيانات السعر للحظات الأخيرة
+    # جلب البيانات عبر yfinance
     df = yf.download(tickers=symbol, period="5d", interval=timeframe, progress=False)
     
-    # معالجة بيانات Columns لمنع أي التعارضات في Pandas
+    if df.empty:
+        return None
+
+    # معالجة أعمدة Pandas MultiIndex إن وجدت
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
 
-    # --------------------------------------
-    # 2. حساب مؤشر GO Strategy (Awesome Oscillator)
-    # --------------------------------------
+    # 1. حساب مؤشر GO Strategy (Awesome Oscillator)
     df['sma_fast'] = ta.sma(df['Close'], length=AO_FAST)
     df['sma_slow'] = ta.sma(df['Close'], length=AO_SLOW)
     df['buffer1'] = df['sma_fast'] - df['sma_slow']
     df['buffer2'] = ta.wma(df['buffer1'], length=SIGNAL_WMA)
 
-    # --------------------------------------
-    # 3. الفلاتر إضافية لزيادة قوة الاستراتيجية
-    # --------------------------------------
-    # فلتر 1: اتجاه الترند العام (EMA 200)
+    # 2. إضافة الفلاتر (EMA 200 & RSI 14)
     df['ema_200'] = ta.ema(df['Close'], length=TREND_EMA)
-    
-    # فلتر 2: قوة الزخم والتشبع (RSI 14)
     df['rsi'] = ta.rsi(df['Close'], length=RSI_PERIOD)
 
-    # --------------------------------------
-    # 4. الشروط الصارمة للدخول في الصفقات
-    # --------------------------------------
-    # التقاطعات الأساسية لمؤشر GO
+    # 3. حساب شروط التقاطع الصارمة
     cross_up = (df['buffer1'] > df['buffer2']) & (df['buffer1'].shift(1) <= df['buffer2'].shift(1))
     cross_down = (df['buffer1'] < df['buffer2']) & (df['buffer1'].shift(1) >= df['buffer2'].shift(1))
 
-    # صفقة شراء (CALL): تقاطع صاعد + السعر فوق EMA200 + RSI غير مشبع بالشراء (< 70)
+    # شروط الشراء والبيع
     df['CALL'] = cross_up & (df['Close'] > df['ema_200']) & (df['rsi'] < 70)
-
-    # صفقة بيع (PUT): تقاطع هابط + السعر تحت EMA200 + RSI غير مشبع بالبيع (> 30)
     df['PUT'] = cross_down & (df['Close'] < df['ema_200']) & (df['rsi'] > 30)
 
     return df
 
+# زر لتحديث البيانات يدوياً
+if st.button("🔄 تحديث الإشارات الآن"):
+    st.rerun()
+
 # ==========================================
-# 5. حلقة التشغيل الفعلي والتنبيهات للحظية
+# 4. عرض النتائج والتنبيهات
 # ==========================================
-print(f"--- بدء تشغيل بوت التداول المطور على زوج {SYMBOL} ---")
+data = fetch_and_analyze_data(SYMBOL, TIMEFRAME)
 
-while True:
-    try:
-        data = fetch_and_analyze_data(SYMBOL, TIMEFRAME)
-        last_candle = data.iloc[-1]
-        previous_candle = data.iloc[-2]
-        
-        current_time = last_candle.name
-        close_price = round(float(last_candle['Close']), 5)
-        
-        # التأكد من إشارة الشمعة المغلقة حديثاً
-        if previous_candle['CALL']:
-            print(f"\n[🚀 إشارة شراء قوية - CALL] | الوقت: {current_time} | السعر: {close_price}")
-            print("--> التوصية: ادخل صفقة صعود (CALL) مدتها 2 إلى 3 شمعات.")
-            # هنا يمكنك إضافة كود تنفيذ الصفقة التلقائي عبر الـ API
-            
-        elif previous_candle['PUT']:
-            print(f"\n[🔻 إشارة بيع قوية - PUT] | الوقت: {current_time} | السعر: {close_price}")
-            print("--> التوصية: ادخل صفقة هبوط (PUT) مدتها 2 إلى 3 شمعات.")
-            # هنا يمكنك إضافة كود تنفيذ الصفقة التلقائي عبر الـ API
-            
-        else:
-            print(f"لا توجد إشارة حاسمة حتى الآن... | السعر الحالي: {close_price}", end="\r")
+if data is None or data.empty:
+    st.error("❌ تعذر جلب البيانات. تأكد من صحة رمز الزوج (مثال: EURUSD=X أو GBPUSD=X).")
+else:
+    # الحصول على آخر شمعتين
+    last_candle = data.iloc[-1]
+    previous_candle = data.iloc[-2]
 
-        # انتظار 10 ثوان قبل الفحص التالي
-        time.sleep(10)
+    current_price = round(float(last_candle['Close']), 5)
+    last_time = last_candle.name
 
-    except Exception as e:
-        print(f"\nحدث خطأ أثناء جلب البيانات: {e}")
-        time.sleep(15)
+    # عرض كروت البيانات السريعة
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("السعر الحالي", f"{current_price}")
+    col2.metric("RSI (14)", f"{round(float(last_candle['rsi']), 2) if not pd.isna(last_candle['rsi']) else 'N/A'}")
+    col3.metric("الفريم", TIMEFRAME)
+    col4.metric("آخر تحديث", f"{last_time.strftime('%H:%M:%S UTC')}")
+
+    st.markdown("---")
+
+    # فحص الإشارات على الشمعة المغلقة حديثاً
+    if previous_candle['CALL']:
+        st.success(f"🚀 **إشارة شراء قوية (CALL)** | الوقت: {previous_candle.name.strftime('%H:%M')} | السعر: {round(float(previous_candle['Close']), 5)}")
+        st.info("💡 **التوصية:** ادخل صفقة **صعود (CALL)** مدتها 2 إلى 3 شمعات على منصة Pocket Option.")
+    elif previous_candle['PUT']:
+        st.error(f"🔻 **إشارة بيع قوية (PUT)** | الوقت: {previous_candle.name.strftime('%H:%M')} | السعر: {round(float(previous_candle['Close']), 5)}")
+        st.info("💡 **التوصية:** ادخل صفقة **هبوط (PUT)** مدتها 2 إلى 3 شمعات على منصة Pocket Option.")
+    else:
+        st.warning("⏳ **لا توجد إشارات دخول حاسمة في الوقت الحالي.** انتظر الشمعة القادمة...")
+
+    # عرض جدول بآخر الشموع والتفاصيل
+    st.subheader("📋 سجل الشموع الأخيرة والمؤشرات")
+    display_df = data[['Close', 'rsi', 'buffer1', 'buffer2', 'CALL', 'PUT']].tail(10)
+    st.dataframe(display_df, use_container_width=True)
