@@ -1,7 +1,7 @@
-pandas<3.0.0
+streamlit
+pandas
 numpy
 yfinance
 pandas-ta
-python-dotenv
-streamlit
+twelvedata
 requests
