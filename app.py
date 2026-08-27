@@ -10,12 +10,12 @@ from datetime import datetime
 # 1. إعدادات الصفحة
 # ==========================================
 st.set_page_config(
-    page_title="ماسح الفرص الاحترافي (مع الفلاتر المتقدمة)",
+    page_title="ماسح الفرص الاحترافي - صلاح",
     page_icon="🛡️",
     layout="wide"
 )
 
-st.title("🛡️ روبوت الإشارات الاحترافي (بفلاتر الاتجاه وتأكيد الشمعة)")
+st.title("🛡️ روبوت الإشارات الاحترافي الخاص بالمتداول: صلاح")
 st.markdown("يقوم البوت بفحص السوق عبر فريم الـ 15 دقيقة مع تطبيق فلاتر الحماية لتقليل الإشارات الكاذبة.")
 st.markdown("---")
 
@@ -48,6 +48,7 @@ PAIRS_MAP = {
 }
 
 st.sidebar.header("⚙️ إعدادات التداول الاحترافية")
+st.sidebar.markdown(f"👤 **المتداول:** صلاح")
 TIMEFRAME = st.sidebar.selectbox("الإطار الزمني للفحص (الفريم):", ["15m", "30m", "1h", "5m"], index=0)
 ENABLE_SOUND = st.sidebar.checkbox("🔊 تفعيل التنبيه الصوتي عند الصفقة", value=True)
 USE_EMA_FILTER = st.sidebar.checkbox("🛡️ تفعيل فلتر الاتجاه العام (EMA 200)", value=True)
@@ -143,7 +144,7 @@ col_t1, col_t2 = st.columns([1, 2])
 col_t1.metric("الوقت المتبقي لفتح الشمعة القادمة", f"{mins_left:02d}:{secs_left:02d}")
 
 if total_rem_secs <= 10:
-    col_t2.error("🚨 **تنبيه:** أوشكت الشمعة الحالية على الإغلاق! استعد لرؤية الإشارات مع البداية الجديدة.")
+    col_t2.error("🚨 **تنبيه:** أوشكت الشمعة الحالية على الإغلاق يا صلاح! استعد لرؤية الإشارات مع البداية الجديدة.")
 else:
     col_t2.info("ℹ️ البوت يفحص الأزواج بناءً على إغلاقات الشمعة المؤكدة لزيادة الأمان.")
 
@@ -169,13 +170,13 @@ elif active_signals:
     if ENABLE_SOUND:
         play_sound_alert()
         
-    st.success(f"🔥 **تم العثور على {len(active_signals)} صفقة مطابقة لشروط الفلاتر الاحترافية بدقة!**")
+    st.success(f"🔥 **مرحباً صلاح، تم العثور على {len(active_signals)} صفقة مطابقة لشروط الفلاتر الاحترافية بدقة!**")
     for item in active_signals:
         sig_text = "🟢 شراء (BUY) - ترند صاعد ومؤكد" if item['signal'] == 1 else "🔴 بيع (SELL) - ترند هابط ومؤكد"
         st.write(f"### 📌 الزوج: **{item['name']}** | التوجيه: **{sig_text}** | السعر: **{item['price']:.4f}** | RSI: **{item['rsi']:.1f}**")
         st.markdown("---")
 else:
-    st.warning("⚪ لا توجد إشارات مستوفية لشروط الفلاتر الصارمة حالياً. البوت ينتظر الفرصة الآمنة.")
+    st.warning("⚪ لا توجد إشارات مستوفية لشروط الفلاتر الصارمة حالياً يا صلاح. البوت ينتظر الفرصة الآمنة.")
 
 # تحديث تلقائي مستمر
 if not market_is_off:
