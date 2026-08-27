@@ -70,7 +70,6 @@ def get_candle_countdown(timeframe_minutes):
 # ==========================================
 def scan_single_pair(name, symbol, timeframe, use_ema):
     try:
-        # جلب بيانات كافية لحساب المتوسطات الطويلة مثل EMA 200
         df = yf.download(symbol, period="5d", interval=timeframe, progress=False)
         if df.empty or len(df) < 205:
             return None
@@ -115,12 +114,10 @@ def scan_single_pair(name, symbol, timeframe, use_ema):
         signal_type = 0
         if not is_market_closed:
             if raw_buy:
-                # شروط الشراء المؤكدة مع فلتر الاتجاه والـ RSI
                 if rsi_now > 50:
                     if not use_ema or (use_ema and price_now > ema_val):
                         signal_type = 1
             elif raw_sell:
-                # شروط البيع المؤكدة مع فلتر الاتجاه والـ RSI
                 if rsi_now < 50:
                     if not use_ema or (use_ema and price_now < ema_val):
                         signal_type = -1
@@ -172,7 +169,7 @@ elif active_signals:
     if ENABLE_SOUND:
         play_sound_alert()
         
-    st.success(🔥 **تم العثور على {len(active_signals)} صفقة مطابقة لشروط الفلاتر الاحترافية بدقة!**")
+    st.success(f"🔥 **تم العثور على {len(active_signals)} صفقة مطابقة لشروط الفلاتر الاحترافية بدقة!**")
     for item in active_signals:
         sig_text = "🟢 شراء (BUY) - ترند صاعد ومؤكد" if item['signal'] == 1 else "🔴 بيع (SELL) - ترند هابط ومؤكد"
         st.write(f"### 📌 الزوج: **{item['name']}** | التوجيه: **{sig_text}** | السعر: **{item['price']:.4f}** | RSI: **{item['rsi']:.1f}**")
