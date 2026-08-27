@@ -10,16 +10,17 @@ from datetime import datetime, timedelta
 # 1. إعدادات الصفحة
 # ==========================================
 st.set_page_config(
-    page_title="روبوت الإشارات الفورية - جميع الأزواج والذهب",
-    page_icon="⚡",
+    page_title="ماسح الفرص والإشارات الفورية",
+    page_icon="🔍",
     layout="wide"
 )
 
-st.title("⚡ روبوت الإشارات الفورية (جميع الأزواج والذهب)")
+st.title("🔍 ماسح الأسواق التلقائي (البحث عن الفرص الجاهزة)")
+st.markdown("يقوم البوت بفحص كافة الأزواج والذهب تلقائياً ويعرض لك فقط الصفحات والإشارات الجاهزة للدخول الآن.")
 st.markdown("---")
 
 # ==========================================
-# 2. قائمة الأزواج المتاحة بدون API Key
+# 2. قائمة الأزواج المراد فحصها تلقائياً
 # ==========================================
 PAIRS_MAP = {
     "الذهب (XAU/USD)": "GC=F",
@@ -42,25 +43,19 @@ PAIRS_MAP = {
 # ==========================================
 # 3. القائمة الجانبية
 # ==========================================
-st.sidebar.header("⚙️ إعدادات الزوج والحساب")
+st.sidebar.header("⚙️ إعدادات الفحص والتكرار")
+TIMEFRAME = st.sidebar.selectbox("الإطار الزمني للفحص (الفريم):", ["5m", "1m", "15m"], index=0)
+AUTO_SCAN = st.sidebar.checkbox("🔄 تفعيل الفحص التلقائي المستمر (كل دقيقة)", value=True)
 
-selected_pair_name = st.sidebar.selectbox("اختر الزوج / الذهب:", list(PAIRS_MAP.keys()), index=1)
-SYMBOL = PAIRS_MAP[selected_pair_name]
-
-TIMEFRAME = st.sidebar.selectbox("الإطار الزمني (الفريم):", ["5m", "1m", "15m"], index=0)
-AUTO_REFRESH = st.sidebar.checkbox("🔄 تفعيل التحديث التلقائي كل دقيقة", value=True)
-
-# تحديد مدة الصفقة بناءً على الفريم
 duration_map = {"1m": 1, "5m": 5, "15m": 15}
 trade_duration = duration_map.get(TIMEFRAME, 5)
 
 # ==========================================
-# 4. دالة جلب البيانات والتحليل
+# 4. دالة فحص الزوج الواحد
 # ==========================================
-def fetch_and_analyze(symbol, timeframe):
+def scan_single_pair(name, symbol, timeframe):
     try:
-        df = yf.download(symbol, period="5d", interval=timeframe, progress=False)
-        
+        df = yf.download(symbol, period="2d", interval=timeframe, progress=False)
         if df.empty:
             return None
             
@@ -73,79 +68,104 @@ def fetch_and_analyze(symbol, timeframe):
         
         close_series = df['Close'].squeeze()
         
-        # المؤشرات
+        # المؤشرات المفلترة
         sma_fast = ta.sma(close_series, length=5)
         sma_slow = ta.sma(close_series, length=34)
-        df['buffer1'] = sma_fast - sma_slow
-        df['buffer2'] = ta.wma(df['buffer1'], length=5)
-        df['rsi'] = ta.rsi(close_series, length=14)
+        buffer1 = sma_fast - sma_slow
+        buffer2 = ta.wma(buffer1, length=5)
+        rsi = ta.rsi(close_series, length=14)
         
-        # الإشارات
-        df['Signal'] = 0
-        raw_buy = (df['buffer1'] > df['buffer2']) & (df['buffer1'].shift(1) <= df['buffer2'].shift(1))
-        raw_sell = (df['buffer1'] < df['buffer2']) & (df['buffer1'].shift(1) >= df['buffer2'].shift(1))
+        # التحقق من أحدث الشموع
+        last_idx = len(df) - 1
+        if last_idx < 2:
+            return None
+            
+        b1_now, b1_prev = buffer1.iloc[last_idx], buffer1.iloc[last_idx - 1]
+        b2_now, b2_prev = buffer2.iloc[last_idx], buffer2.iloc[last_idx - 1]
+        rsi_now = rsi.iloc[last_idx]
+        price_now = close_series.iloc[last_idx]
+        time_now = df['datetime'].iloc[last_idx]
         
-        df.loc[raw_buy & (df['rsi'] > 50), 'Signal'] = 1
-        df.loc[raw_sell & (df['rsi'] < 50), 'Signal'] = -1
+        # شروط الإشارة المفلترة الدقيقة
+        raw_buy = (b1_now > b2_now) and (b1_prev <= b2_prev)
+        raw_sell = (b1_now < b2_now) and (b1_prev >= b2_prev)
         
-        return df
-    except Exception as e:
-        st.error(f"حدث خطأ أثناء جلب البيانات: {e}")
+        signal_type = 0
+        if raw_buy and rsi_now > 50:
+            signal_type = 1
+        elif raw_sell and rsi_now < 50:
+            signal_type = -1
+            
+        return {
+            "name": name,
+            "symbol": symbol,
+            "price": price_now,
+            "rsi": rsi_now,
+            "time": time_now,
+            "signal": signal_type
+        }
+    except Exception:
         return None
 
 # ==========================================
-# 5. عرض البيانات والتوجيهات
+# 5. تشغيل الفحص على كافة الأزواج
 # ==========================================
-data = fetch_and_analyze(SYMBOL, TIMEFRAME)
+with st.spinner("🔍 جاري فحص كافة الأزواج والذهب في السوق..."):
+    active_signals = []
+    all_market_status = []
+    
+    for name, sym in PAIRS_MAP.items():
+        res = scan_single_pair(name, sym, TIMEFRAME)
+        if res is not None:
+            all_market_status.append(res)
+            if res['signal'] != 0:
+                active_signals.append(res)
 
-if data is not None and not data.empty:
-    latest = data.iloc[-1]
-    current_price = latest['Close']
-    current_rsi = latest['rsi']
-    last_signal = latest['Signal']
-    last_time = latest['datetime']
+# ==========================================
+# 6. عرض النتائج والفرص الجاهزة
+# ==========================================
+if active_signals:
+    st.success(f"🔥 تم العثور على {len(active_signals)} فرصة تداول مفلترة جاهزة الآن!")
     
-    # حساب وقت الدخول بالدقيقة للشمعة التالية
-    next_entry_time = last_time + timedelta(minutes=trade_duration)
-    entry_time_str = next_entry_time.strftime('%H:%M:%S')
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric("الزوج المختار", f"{selected_pair_name} ({TIMEFRAME})")
-    col2.metric("السعر الحالي", f"{current_price:.5f}" if "JPY" not in SYMBOL and "GC" not in SYMBOL else f"{current_price:.2f}")
-    col3.metric("مؤشر RSI", f"{current_rsi:.1f}" if pd.notnull(current_rsi) else "N/A")
-    
-    st.markdown("---")
-    
-    if last_signal == 1:
-        st.success(f"🟢 **إشارة شراء مفلترة (BUY) لـ {selected_pair_name}**")
-        st.info(
-            f"🎯 **تعليمات الدخول الدقيقة:**\n\n"
-            f"* **توقيت الدخول:** ادخل صفقة شراء **عند الدقيقة `{entry_time_str}` بالضبط** (مع افتتاح الشمعة التالية).\n"
-            f"* **مدة الصفقة:** اضبط المؤقت في المنصة على **`{trade_duration} دقائق`**."
-        )
-    elif last_signal == -1:
-        st.error(f"🔴 **إشارة بيع مفلترة (SELL) لـ {selected_pair_name}**")
-        st.info(
-            f"🎯 **تعليمات الدخول الدقيقة:**\n\n"
-            f"* **توقيت الدخول:** ادخل صفقة بيع **عند الدقيقة `{entry_time_str}` بالضبط** (مع افتتاح الشمعة التالية).\n"
-            f"* **مدة الصفقة:** اضبط المؤقت في المنصة على **`{trade_duration} دقائق`**."
-        )
-    else:
-        st.warning(
-            f"⚪ **لا توجد إشارة جديدة على {selected_pair_name} حالياً**\n\n"
-            f"يمكنك تغيير الزوج من القائمة الجانبية أو الانتظار حتى تتغير الإشارة."
-        )
+    for item in active_signals:
+        next_entry_time = item['time'] + timedelta(minutes=trade_duration)
+        entry_time_str = next_entry_time.strftime('%H:%M:%S')
         
-    st.markdown("---")
-    st.subheader(f"📋 سجل الإشارات الأخيرة لـ {selected_pair_name}")
-    signals_df = data[data['Signal'] != 0][['datetime', 'Close', 'rsi', 'Signal']].tail(5)
-    if not signals_df.empty:
-        signals_df['نوع الإشارة'] = signals_df['Signal'].map({1: '🟢 شراء', -1: '🔴 بيع'})
-        st.dataframe(signals_df[['datetime', 'Close', 'rsi', 'نوع الإشارة']], use_container_width=True)
+        with st.container():
+            col1, col2, col3 = st.columns(3)
+            col1.subheader(f"📌 {item['name']}")
+            col2.metric("السعر الحالي", f"{item['price']:.5f}" if "JPY" not in item['symbol'] and "GC" not in item['symbol'] else f"{item['price']:.2f}")
+            col3.metric("RSI", f"{item['rsi']:.1f}")
+            
+            if item['signal'] == 1:
+                st.success(
+                    f"🟢 **إشارة شراء (BUY)**\n\n"
+                    f"* 🎯 **وقت الدخول:** ادخل عند الدقيقة `{entry_time_str}` بالضبط.\n"
+                    f"* ⏱️ **مدة الصفقة:** `{trade_duration} دقائق`."
+                )
+            else:
+                st.error(
+                    f"🔴 **إشارة بيع (SELL)**\n\n"
+                    f"* 🎯 **وقت الدخول:** ادخل عند الدقيقة `{entry_time_str}` بالضبط.\n"
+                    f"* ⏱️ **مدة الصفقة:** `{trade_duration} دقائق`."
+                )
+            st.markdown("---")
+else:
+    st.warning("⚪ لا توجد إشارات جديدة جاهزة للدخول على أي زوج في هذه اللحظة. البوت يستمر بالفحص المباشر...")
+
+# جدول حالة السوق الكلية
+st.subheader("📊 حالة جميع الأزواج المفحوصة")
+if all_market_status:
+    df_status = pd.DataFrame(all_market_status)
+    df_status['الحالة'] = df_status['signal'].map({1: '🟢 شراء جاهز', -1: '🔴 بيع جاهز', 0: '⚪ انتظار'})
+    df_status['السعر'] = df_status.apply(lambda r: f"{r['price']:.5f}" if "JPY" not in r['symbol'] and "GC" not in r['symbol'] else f"{r['price']:.2f}", axis=1)
+    df_status['RSI'] = df_status['rsi'].round(1)
+    
+    st.dataframe(df_status[['name', 'السعر', 'RSI', 'الحالة']], use_container_width=True)
 
 # ==========================================
-# 6. التحديث التلقائي
+# 7. التحديث التلقائي
 # ==========================================
-if AUTO_REFRESH:
+if AUTO_SCAN:
     time.sleep(60)
     st.rerun()
