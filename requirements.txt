@@ -1,7 +1,7 @@
-pandas
+pandas<3.0.0
 numpy
 yfinance
-https://github.com/twopirllc/pandas-ta/archive/refs/heads/main.zip
+pandas-ta
 python-dotenv
 streamlit
 requests
