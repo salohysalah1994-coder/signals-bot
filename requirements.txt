@@ -1,5 +1,7 @@
 pandas
 numpy
 yfinance
-pandas_ta
+pandas-ta
+python-dotenv
 streamlit
+requests
