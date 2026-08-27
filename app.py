@@ -10,17 +10,29 @@ from datetime import datetime, timedelta
 # 1. إعدادات الصفحة
 # ==========================================
 st.set_page_config(
-    page_title="ماسح الفرص + العداد التنازلي",
-    page_icon="⏱️",
+    page_title="ماسح الفرص + التنبيه الصوتي",
+    page_icon="🔔",
     layout="wide"
 )
 
-st.title("⏱️ ماسح الفرص مع العداد التنازلي المباشر")
-st.markdown("يقوم البوت بفحص الأسواق ويعرض العداد التنازلي المتبقي لإغلاق الشمعة الحالية لضمان الدخول في اللحظة الدقيقة.")
+st.title("🔔 روبوت الإشارات الفورية (مع التنبيه الصوتي والعداد)")
+st.markdown("يقوم البوت بفحص كافة الأزواج تلقائياً وإصدار **صوت تنبيه (جرس)** فور توفر صفقة مؤكدة.")
 st.markdown("---")
 
 # ==========================================
-# 2. قائمة الأزواج المراد فحصها
+# 2. دالة تشغيل التنبيه الصوتي
+# ==========================================
+def play_sound_alert():
+    # ملف صوتي لجرس تنبيه يعمل عبر المتصفح
+    audio_html = """
+        <audio autoplay style="display:none;">
+            <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+        </audio>
+    """
+    st.components.v1.html(audio_html, height=0)
+
+# ==========================================
+# 3. قائمة الأزواج والإعدادات
 # ==========================================
 PAIRS_MAP = {
     "الذهب (XAU/USD)": "GC=F",
@@ -36,35 +48,25 @@ PAIRS_MAP = {
     "GBP/JPY": "GBPJPY=X"
 }
 
-# ==========================================
-# 3. القائمة الجانبية
-# ==========================================
-st.sidebar.header("⚙️ إعدادات الفحص والتوقيت")
+st.sidebar.header("⚙️ إعدادات التداول")
 TIMEFRAME = st.sidebar.selectbox("الإطار الزمني للفحص (الفريم):", ["5m", "1m", "15m"], index=0)
+ENABLE_SOUND = st.sidebar.checkbox("🔊 تفعيل التنبيه الصوتي عند الصفقة", value=True)
 
 duration_map = {"1m": 1, "5m": 5, "15m": 15}
 trade_duration = duration_map.get(TIMEFRAME, 5)
 
 # ==========================================
-# 4. دالة حساب الوقت المتبقي للشمعة الحالية
+# 4. حساب العداد التنازلي
 # ==========================================
 def get_candle_countdown(timeframe_minutes):
     now = datetime.now()
     minutes_past = now.minute % timeframe_minutes
     seconds_past = now.second
-    
-    total_seconds_passed = (minutes_past * 60) + seconds_past
-    total_seconds_in_candle = timeframe_minutes * 60
-    
-    remaining_seconds = total_seconds_in_candle - total_seconds_passed
-    
-    mins_left = remaining_seconds // 60
-    secs_left = remaining_seconds % 60
-    
-    return mins_left, secs_left, remaining_seconds
+    remaining_seconds = (timeframe_minutes * 60) - ((minutes_past * 60) + seconds_past)
+    return remaining_seconds // 60, remaining_seconds % 60, remaining_seconds
 
 # ==========================================
-# 5. دالة فحص الزوج
+# 5. فحص البيانات والصفقات
 # ==========================================
 def scan_single_pair(name, symbol, timeframe):
     try:
@@ -78,10 +80,8 @@ def scan_single_pair(name, symbol, timeframe):
         df = df.reset_index()
         time_col = 'Datetime' if 'Datetime' in df.columns else 'Date'
         df['datetime'] = pd.to_datetime(df[time_col])
-        
         close_series = df['Close'].squeeze()
         
-        # مؤشرات الفلترة
         sma_fast = ta.sma(close_series, length=5)
         sma_slow = ta.sma(close_series, length=34)
         buffer1 = sma_fast - sma_slow
@@ -93,7 +93,6 @@ def scan_single_pair(name, symbol, timeframe):
             return None
             
         time_now = df['datetime'].iloc[last_idx]
-        
         time_diff = (datetime.utcnow() - time_now.tz_localize(None)).total_seconds() / 60
         is_market_closed = time_diff > 30
             
@@ -117,7 +116,6 @@ def scan_single_pair(name, symbol, timeframe):
             "symbol": symbol,
             "price": price_now,
             "rsi": rsi_now,
-            "time": time_now,
             "signal": signal_type,
             "is_closed": is_market_closed
         }
@@ -125,27 +123,22 @@ def scan_single_pair(name, symbol, timeframe):
         return None
 
 # ==========================================
-# 6. عرض العداد المباشر والفرص
+# 6. العرض والتنبيهات
 # ==========================================
 mins_left, secs_left, total_rem_secs = get_candle_countdown(trade_duration)
 
-# عرض شريط العداد والتنبيه
-st.subheader("⏳ حالة الشمعة الحالية")
-col_time1, col_time2 = st.columns([1, 2])
-
-col_time1.metric("الوقت المتبقي لإغلاق الشمعة", f"{mins_left:02d}:{secs_left:02d}")
+st.subheader("⏳ العداد التنازلي لإغلاق الشمعة")
+col_t1, col_t2 = st.columns([1, 2])
+col_t1.metric("المتبقي للدخول", f"{mins_left:02d}:{secs_left:02d}")
 
 if total_rem_secs <= 10:
-    col_time2.error("🚨 **تنبيه عاجل:** الشمعة على وشك الإغلاق! جهّز نفسك للدخول فوراً مع بداية الشمعة الجديدة!")
-elif total_rem_secs <= 30:
-    col_time2.warning("⚠️ **استعداد:** باقي أقل من 30 ثانية. افتح المنصة وجهّز مبلغ الصفقة.")
+    col_t2.error("🚨 **تنبيه:** باقي 10 ثوانٍ! جهّز دخول الصفقة فوراً عند وصول العداد لـ 00:00!")
 else:
-    col_time2.info("ℹ️ الشمعة جارية حالياً. انتظر انتهاء العداد التنازلي لإغلاقها.")
+    col_t2.info("ℹ️ انتظر صفارة التنبيه أو وصول العداد لـ 00:00 لافتتاح الشمعة الجديدة.")
 
 st.markdown("---")
 
-# فحص الأزواج
-with st.spinner("🔍 جاري فحص حالة السوق والأزواج..."):
+with st.spinner("🔍 جاري فحص جميع الأزواج والبحث عن إشارات..."):
     active_signals = []
     all_market_status = []
     market_is_off = False
@@ -160,44 +153,21 @@ with st.spinner("🔍 جاري فحص حالة السوق والأزواج..."):
                 active_signals.append(res)
 
 if market_is_off:
-    st.error("🔴 **سوق الفوركس والذهب مغلق حالياً (العطلة الأسبوعية).**")
-
+    st.error("🔴 **سوق الفوركس والذهب مغلق حالياً.**")
 elif active_signals:
-    st.success(f"🔥 تم العثور على {len(active_signals)} فرصة تداول مفلترة حية الآن!")
-    
+    # تشغيل الصفير/التنبيه الصوتي عند وجود صفقة
+    if ENABLE_SOUND:
+        play_sound_alert()
+        
+    st.success(f"🔔 **تم العثور على {len(active_signals)} صفقة حية ومؤكدة الآن!**")
     for item in active_signals:
-        with st.container():
-            col1, col2, col3 = st.columns(3)
-            col1.subheader(f"📌 {item['name']}")
-            col2.metric("السعر الحالي", f"{item['price']:.5f}" if "JPY" not in item['symbol'] and "GC" not in item['symbol'] else f"{item['price']:.2f}")
-            col3.metric("RSI", f"{item['rsi']:.1f}")
-            
-            sig_text = "🟢 شراء (BUY)" if item['signal'] == 1 else "🔴 بيع (SELL)"
-            
-            st.markdown(
-                f"🎯 **توجيه الصفقة:**\n"
-                f"* **النوع:** {sig_text}\n"
-                f"* **توقيت التنفيذ:** ادخل فور انتهاء العداد اعلاه عند الوصول لـ `00:00`.\n"
-                f"* **مدة الصفقة:** `{trade_duration} دقائق`."
-            )
-            st.markdown("---")
+        sig_text = "🟢 شراء (BUY)" if item['signal'] == 1 else "🔴 بيع (SELL)"
+        st.write(f"### 📌 الزوج: **{item['name']}** | التوجيه: **{sig_text}** | مدة الصفقة: **{trade_duration} دقائق**")
+        st.markdown("---")
 else:
-    st.warning("⚪ لا توجد إشارات جديدة حية حالياً. البوت يستمر بالفحص المباشر...")
+    st.warning("⚪ لا توجد إشارات حية حالياً. البوت يفحص باستمرار وسيصدر صفير فور ظهور صفقة جديدة.")
 
-# جدول حالة جميع الأزواج
-st.subheader("📊 حالة جميع الأزواج المفحوصة")
-if all_market_status:
-    df_status = pd.DataFrame(all_market_status)
-    df_status['الحالة'] = df_status.apply(
-        lambda r: '🔴 السوق مغلق' if r['is_closed'] else ('🟢 شراء جاهز' if r['signal'] == 1 else ('🔴 بيع جاهز' if r['signal'] == -1 else '⚪ انتظار')), 
-        axis=1
-    )
-    df_status['السعر'] = df_status.apply(lambda r: f"{r['price']:.5f}" if "JPY" not in r['symbol'] and "GC" not in r['symbol'] else f"{r['price']:.2f}", axis=1)
-    df_status['RSI'] = df_status['rsi'].round(1)
-    
-    st.dataframe(df_status[['name', 'السعر', 'RSI', 'الحالة']], use_container_width=True)
-
-# تحديث الصفحة كل ثانية عند اقتراب الإغلاق
+# تحديث تلقائي مستمر
 if not market_is_off:
     time.sleep(2)
     st.rerun()
