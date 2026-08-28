@@ -16,15 +16,15 @@ st.set_page_config(
 )
 
 st.title("⚡ روبوت الـ OTC الاحترافي الخاص بالمتداول: صلاح")
-st.markdown("يقوم البوت بفحص السوق مطبقاً الاستراتيجية الاحترافية وبدون قيود إغلاق السوق.")
+st.markdown("يقوم البوت بفحص السوق مطبقاً الاستراتيجية الاحترافية مع توثيق وقت وصول الإشارة بالثانية.")
 st.markdown("---")
 
 # ==========================================
-# 2. دالة تشغيل التنبيه الصوتي
+# 2. دالة تشغيل التنبيه الصوتي (مع تفعيل تفاعل المستخدم)
 # ==========================================
 def play_sound_alert():
     audio_html = """
-        <audio autoplay style="display:none;">
+        <audio autoplay controls style="display:none;">
             <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
         </audio>
     """
@@ -67,7 +67,7 @@ def get_candle_countdown(timeframe_minutes):
     return remaining_seconds // 60, remaining_seconds % 60, remaining_seconds
 
 # ==========================================
-# 5. فحص البيانات بالاستراتيجية الأصلية (بدون قيود إغلاق)
+# 5. فحص البيانات بالاستراتيجية الاحترافية
 # ==========================================
 def scan_otc_strategy(name, symbol, timeframe, use_ema):
     try:
@@ -83,7 +83,6 @@ def scan_otc_strategy(name, symbol, timeframe, use_ema):
         df['datetime'] = pd.to_datetime(df[time_col])
         close_series = df['Close'].squeeze()
         
-        # مؤشرات الاستراتيجية الأصلية الاحترافية
         sma_fast = ta.sma(close_series, length=5)
         sma_slow = ta.sma(close_series, length=34)
         buffer1 = sma_fast - sma_slow
@@ -101,7 +100,6 @@ def scan_otc_strategy(name, symbol, timeframe, use_ema):
         price_now = close_series.iloc[last_idx]
         ema_val = ema_200.iloc[last_idx] if ema_200 is not None else price_now
         
-        # شروط التقاطع الأصلية
         raw_buy = (b1_now > b2_now) and (b1_prev <= b2_prev)
         raw_sell = (b1_now < b2_now) and (b1_prev >= b2_prev)
         
@@ -115,12 +113,16 @@ def scan_otc_strategy(name, symbol, timeframe, use_ema):
                 if not use_ema or (use_ema and price_now < ema_val):
                     signal_type = -1
             
+        # تسجيل وقت وصول الصفقة بدقة (الساعة، الدقيقة، الثانية)
+        signal_time = datetime.now().strftime("%H:%M:%S")
+
         return {
             "name": name,
             "symbol": symbol,
             "price": price_now,
             "rsi": rsi_now,
-            "signal": signal_type
+            "signal": signal_type,
+            "time": signal_time
         }
     except Exception:
         return None
@@ -133,7 +135,7 @@ mins_left, secs_left, total_rem_secs = get_candle_countdown(trade_duration)
 st.subheader("⏳ العداد التنازلي لإغلاق الشمعة الحالية")
 col_t1, col_t2 = st.columns([1, 2])
 col_t1.metric("الوقت المتبقي لفتح الشمعة القادمة", f"{mins_left:02d}:{secs_left:02d}")
-col_t2.info("⚡ البوت يعمل باستراتيجيتك الاحترافية ومستمر في فحص السوق دون توقف.")
+col_t2.info("⚡ البوت يعمل بانتظام. (ملاحظة: لضمان عمل الصوت بالموبايل، قم بالضغط مرة واحدة في أي مكان بالصفحة عند فتحها).")
 
 st.markdown("---")
 
@@ -152,7 +154,8 @@ if active_signals:
     st.success(f"🔥 **مرحباً صلاح، تم العثور على {len(active_signals)} فرصة مطابقة لاستراتيجيتك بدقة!**")
     for item in active_signals:
         sig_text = "🟢 صعود (CALL) - إشارة شراء مؤكدة" if item['signal'] == 1 else "🔴 هبوط (PUT) - إشارة بيع مؤكدة"
-        st.write(f"### 📌 الزوج: **{item['name']}** | التوجيه: **{sig_text}** | السعر: **{item['price']:.4f}** | RSI: **{item['rsi']:.1f}**")
+        st.write(f"⏱️ **وقت وصول الإشارة:** `{item['time']}` | 📌 الزوج: **{item['name']}**")
+        st.write(f"التوجيه: **{sig_text}** | السعر: **{item['price']:.4f}** | RSI: **{item['rsi']:.1f}**")
         st.markdown("---")
 else:
     st.warning("⚪ البوت يفحص الشارت بنظام الاستراتيجية... بانتظار تشكل الفرصة المناسبة يا صلاح.")
