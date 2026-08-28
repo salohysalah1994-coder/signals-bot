@@ -10,13 +10,13 @@ from datetime import datetime
 # 1. إعدادات الصفحة
 # ==========================================
 st.set_page_config(
-    page_title="ماسح الفرص الاحترافي - صلاح",
-    page_icon="🛡️",
+    page_title="ماسح صفقات الـ OTC الاحترافي - صلاح",
+    page_icon="⚡",
     layout="wide"
 )
 
-st.title("🛡️ روبوت الإشارات الاحترافي الخاص بالمتداول: صلاح")
-st.markdown("يقوم البوت بفحص السوق عبر فريم الـ 15 دقيقة مع تطبيق فلاتر الحماية لتقليل الإشارات الكاذبة.")
+st.title("⚡ روبوت الـ OTC الاحترافي الخاص بالمتداول: صلاح")
+st.markdown("يقوم البوت بفحص السوق مطبقاً الاستراتيجية الاحترافية وبدون قيود إغلاق السوق.")
 st.markdown("---")
 
 # ==========================================
@@ -34,7 +34,6 @@ def play_sound_alert():
 # 3. قائمة الأزواج والإعدادات
 # ==========================================
 PAIRS_MAP = {
-    "الذهب (XAU/USD)": "GC=F",
     "EUR/USD": "EURUSD=X",
     "GBP/USD": "GBPUSD=X",
     "USD/JPY": "USDJPY=X",
@@ -44,10 +43,11 @@ PAIRS_MAP = {
     "NZD/USD": "NZDUSD=X",
     "EUR/GBP": "EURGBP=X",
     "EUR/JPY": "EURJPY=X",
-    "GBP/JPY": "GBPJPY=X"
+    "GBP/JPY": "GBPJPY=X",
+    "الذهب (XAU/USD)": "GC=F"
 }
 
-st.sidebar.header("⚙️ إعدادات التداول الاحترافية")
+st.sidebar.header("⚙️ إعدادات تداول الـ OTC")
 st.sidebar.markdown(f"👤 **المتداول:** صلاح")
 TIMEFRAME = st.sidebar.selectbox("الإطار الزمني للفحص (الفريم):", ["15m", "30m", "1h", "5m"], index=0)
 ENABLE_SOUND = st.sidebar.checkbox("🔊 تفعيل التنبيه الصوتي عند الصفقة", value=True)
@@ -67,9 +67,9 @@ def get_candle_countdown(timeframe_minutes):
     return remaining_seconds // 60, remaining_seconds % 60, remaining_seconds
 
 # ==========================================
-# 5. فحص البيانات والصفقات بالفلاتر الذكية
+# 5. فحص البيانات بالاستراتيجية الأصلية (بدون قيود إغلاق)
 # ==========================================
-def scan_single_pair(name, symbol, timeframe, use_ema):
+def scan_otc_strategy(name, symbol, timeframe, use_ema):
     try:
         df = yf.download(symbol, period="5d", interval=timeframe, progress=False)
         if df.empty or len(df) < 205:
@@ -83,24 +83,17 @@ def scan_single_pair(name, symbol, timeframe, use_ema):
         df['datetime'] = pd.to_datetime(df[time_col])
         close_series = df['Close'].squeeze()
         
-        # المؤشرات الأساسية
+        # مؤشرات الاستراتيجية الأصلية الاحترافية
         sma_fast = ta.sma(close_series, length=5)
         sma_slow = ta.sma(close_series, length=34)
         buffer1 = sma_fast - sma_slow
         buffer2 = ta.wma(buffer1, length=5)
         rsi = ta.rsi(close_series, length=14)
-        
-        # فلتر الاتجاه العام الكبير (EMA 200)
         ema_200 = ta.ema(close_series, length=200)
         
-        # نأخذ مؤشرات الشمعة السابقة المؤكدة (لضمان إغلاق الشمعة وتجنب التلاعب اللحظي)
         last_idx = len(df) - 2 
         if last_idx < 200:
             return None
-            
-        time_now = df['datetime'].iloc[last_idx]
-        time_diff = (datetime.utcnow() - time_now.tz_localize(None)).total_seconds() / 60
-        is_market_closed = time_diff > (trade_duration * 3)
             
         b1_now, b1_prev = buffer1.iloc[last_idx], buffer1.iloc[last_idx - 1]
         b2_now, b2_prev = buffer2.iloc[last_idx], buffer2.iloc[last_idx - 1]
@@ -108,77 +101,62 @@ def scan_single_pair(name, symbol, timeframe, use_ema):
         price_now = close_series.iloc[last_idx]
         ema_val = ema_200.iloc[last_idx] if ema_200 is not None else price_now
         
-        # الشروط الأساسية للتقاطع
+        # شروط التقاطع الأصلية
         raw_buy = (b1_now > b2_now) and (b1_prev <= b2_prev)
         raw_sell = (b1_now < b2_now) and (b1_prev >= b2_prev)
         
         signal_type = 0
-        if not is_market_closed:
-            if raw_buy:
-                if rsi_now > 50:
-                    if not use_ema or (use_ema and price_now > ema_val):
-                        signal_type = 1
-            elif raw_sell:
-                if rsi_now < 50:
-                    if not use_ema or (use_ema and price_now < ema_val):
-                        signal_type = -1
+        if raw_buy:
+            if rsi_now > 50:
+                if not use_ema or (use_ema and price_now > ema_val):
+                    signal_type = 1
+        elif raw_sell:
+            if rsi_now < 50:
+                if not use_ema or (use_ema and price_now < ema_val):
+                    signal_type = -1
             
         return {
             "name": name,
             "symbol": symbol,
             "price": price_now,
             "rsi": rsi_now,
-            "signal": signal_type,
-            "is_closed": is_market_closed
+            "signal": signal_type
         }
     except Exception:
         return None
 
 # ==========================================
-# 6. العرض والتنبيهات
+# 6. العرض والتنبيهات المستمرة
 # ==========================================
 mins_left, secs_left, total_rem_secs = get_candle_countdown(trade_duration)
 
 st.subheader("⏳ العداد التنازلي لإغلاق الشمعة الحالية")
 col_t1, col_t2 = st.columns([1, 2])
 col_t1.metric("الوقت المتبقي لفتح الشمعة القادمة", f"{mins_left:02d}:{secs_left:02d}")
-
-if total_rem_secs <= 10:
-    col_t2.error("🚨 **تنبيه:** أوشكت الشمعة الحالية على الإغلاق يا صلاح! استعد لرؤية الإشارات مع البداية الجديدة.")
-else:
-    col_t2.info("ℹ️ البوت يفحص الأزواج بناءً على إغلاقات الشمعة المؤكدة لزيادة الأمان.")
+col_t2.info("⚡ البوت يعمل باستراتيجيتك الاحترافية ومستمر في فحص السوق دون توقف.")
 
 st.markdown("---")
 
-with st.spinner("🔍 جاري فحص الأزواج وتطبيق فلاتر الحماية..."):
+with st.spinner("🔍 جاري فحص الأزواج وتطبيق الاستراتيجية الاحترافية..."):
     active_signals = []
-    all_market_status = []
-    market_is_off = False
     
     for name, sym in PAIRS_MAP.items():
-        res = scan_single_pair(name, sym, TIMEFRAME, USE_EMA_FILTER)
-        if res is not None:
-            all_market_status.append(res)
-            if res['is_closed']:
-                market_is_off = True
-            elif res['signal'] != 0:
-                active_signals.append(res)
+        res = scan_otc_strategy(name, sym, TIMEFRAME, USE_EMA_FILTER)
+        if res is not None and res['signal'] != 0:
+            active_signals.append(res)
 
-if market_is_off:
-    st.error("🔴 **سوق الفوركس والذهب مغلق حالياً.**")
-elif active_signals:
+if active_signals:
     if ENABLE_SOUND:
         play_sound_alert()
         
-    st.success(f"🔥 **مرحباً صلاح، تم العثور على {len(active_signals)} صفقة مطابقة لشروط الفلاتر الاحترافية بدقة!**")
+    st.success(f"🔥 **مرحباً صلاح، تم العثور على {len(active_signals)} فرصة مطابقة لاستراتيجيتك بدقة!**")
     for item in active_signals:
-        sig_text = "🟢 شراء (BUY) - ترند صاعد ومؤكد" if item['signal'] == 1 else "🔴 بيع (SELL) - ترند هابط ومؤكد"
+        sig_text = "🟢 صعود (CALL) - إشارة شراء مؤكدة" if item['signal'] == 1 else "🔴 هبوط (PUT) - إشارة بيع مؤكدة"
         st.write(f"### 📌 الزوج: **{item['name']}** | التوجيه: **{sig_text}** | السعر: **{item['price']:.4f}** | RSI: **{item['rsi']:.1f}**")
         st.markdown("---")
 else:
-    st.warning("⚪ لا توجد إشارات مستوفية لشروط الفلاتر الصارمة حالياً يا صلاح. البوت ينتظر الفرصة الآمنة.")
+    st.warning("⚪ البوت يفحص الشارت بنظام الاستراتيجية... بانتظار تشكل الفرصة المناسبة يا صلاح.")
 
-# تحديث تلقائي مستمر
-if not market_is_off:
-    time.sleep(3)
-    st.rerun()
+# تحديث تلقائي مستمر بدون توقف
+time.sleep(3)
+st.rerun()
