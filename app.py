@@ -10,13 +10,13 @@ from datetime import datetime
 # 1. إعدادات الصفحة
 # ==========================================
 st.set_page_config(
-    page_title="ماسح صفقات الـ OTC الاحترافي - صلاح",
-    page_icon="⚡",
+    page_title="ماسح صفقات الفوركس الحقيقي - صلاح",
+    page_icon="📈",
     layout="wide"
 )
 
-st.title("⚡ روبوت الـ OTC الاحترافي (حذف الإشارات القديمة تلقائياً) - صلاح")
-st.markdown("البوت مبرمج لإظهار الإشارات الحصرية وتحديثها فوراً مع كل شمعة جديدة.")
+st.title("📈 روبوت الفوركس الحقيقي (سوق رسمي) - صلاح")
+st.markdown("البوت مخصص للعمل على أزواج الفوركس الرسمية وفقاً لساعات عمل الأسواق العالمية.")
 st.markdown("---")
 
 # ==========================================
@@ -39,7 +39,7 @@ def play_sound_alert():
     st.components.v1.html(audio_html, height=0)
 
 # ==========================================
-# 4. قائمة الأزواج والإعدادات
+# 4. قائمة أزواج الفوركس الحقيقية والإعدادات
 # ==========================================
 PAIRS_MAP = {
     "EUR/USD": "EURUSD=X",
@@ -55,7 +55,7 @@ PAIRS_MAP = {
     "الذهب (XAU/USD)": "GC=F"
 }
 
-st.sidebar.header("⚙️ إعدادات تداول الـ OTC")
+st.sidebar.header("⚙️ إعدادات سوق الفوركس")
 st.sidebar.markdown(f"👤 **المتداول:** صلاح")
 TIMEFRAME = st.sidebar.selectbox("الإطار الزمني للفحص (الفريم):", ["15m", "30m", "1h", "5m"], index=0)
 ENABLE_SOUND = st.sidebar.checkbox("🔊 تفعيل التنبيه الصوتي عند الصفقة", value=True)
@@ -77,7 +77,7 @@ def get_candle_countdown(timeframe_minutes):
 # ==========================================
 # 6. فحص البيانات بالشمعة المغلقة
 # ==========================================
-def scan_otc_strategy(name, symbol, timeframe, use_ema):
+def scan_forex_strategy(name, symbol, timeframe, use_ema):
     try:
         df = yf.download(symbol, period="5d", interval=timeframe, progress=False)
         if df.empty or len(df) < 205:
@@ -142,25 +142,23 @@ mins_left, secs_left, total_rem_secs = get_candle_countdown(trade_duration)
 st.subheader("⏳ العداد التنازلي لإغلاق الشمعة الحالية")
 col_t1, col_t2 = st.columns([1, 2])
 col_t1.metric("الوقت المتبقي لإغلاق الشمعة", f"{mins_left:02d}:{secs_left:02d}")
-col_t2.info("⚡ البوت يمسح أي إشارة قديمة تلقائياً عندما تبتر الشمعة أوانها، لتعرض صفقات الشمعة الحالية فقط.")
+col_t2.info("📈 البوت متصل بسوق الفوركس الرسمي ويقوم بتحديث الصفقات الحصرية أولاً بأول.")
 
 st.markdown("---")
 
-# إذا دخلنا في آخر دقيقتين من عمر الشمعة (أو تغيرت الشمعة)، نقوم بتنظيف الكاش القديم تماماً لمنع عرض صفقات انتهى وقتها
 if total_rem_secs < 120:  
     st.session_state.active_signals_cache = []
 
-with st.spinner("🔍 جاري فحص السوق وتحديث الصفقات..."):
+with st.spinner("🔍 جاري فحص سوق الفوركس الرسمي وتحديث الصفقات..."):
     current_time_str = datetime.now().strftime("%H:%M:%S")
     new_signals = []
     
     for name, sym in PAIRS_MAP.items():
-        res = scan_otc_strategy(name, sym, TIMEFRAME, USE_EMA_FILTER)
+        res = scan_forex_strategy(name, sym, TIMEFRAME, USE_EMA_FILTER)
         if res is not None and res['signal'] != 0:
             res['time'] = current_time_str
             new_signals.append(res)
             
-    # تحديث الكاش فقط إذا ظهرت إشارات جديدة لشمعة سليمة
     if new_signals and total_rem_secs > 120:
         st.session_state.active_signals_cache = new_signals
 
@@ -168,14 +166,14 @@ if st.session_state.active_signals_cache and total_rem_secs > 120:
     if ENABLE_SOUND:
         play_sound_alert()
         
-    st.success(f"🔥 **ممتاز يا صلاح، تم رصد {len(st.session_state.active_signals_cache)} فرصة صالحة للشمعة الحالية!**")
+    st.success(f"🔥 **ممتاز يا صلاح، تم رصد {len(st.session_state.active_signals_cache)} فرصة فوركس حقيقية ومؤكدة!**")
     for item in st.session_state.active_signals_cache:
-        sig_text = "🟢 صعود (CALL) - شراء مؤكد" if item['signal'] == 1 else "🔴 هبوط (PUT) - بيع مؤكد"
+        sig_text = "🟢 صعود (CALL) - شراء فوركس" if item['signal'] == 1 else "🔴 هبوط (PUT) - بيع فوركس"
         st.write(f"⏱️ **وقت التوليد:** `{item['time']}` | 📌 الزوج: **{item['name']}**")
         st.write(f"التوجيه: **{sig_text}** | السعر: **{item['price']:.4f}** | RSI: **{item['rsi']:.1f}**")
         st.markdown("---")
 else:
-    st.warning("⚪ بانتظار إغلاق الشمعة الحالية وتكوين إشارات جديدة نظيفة وصالحة للتداول يا صلاح.")
+    st.warning("⚪ البوت يفحص سوق الفوركس... بانتظار تشكل فرصة نظامية جديدة يا صلاح.")
 
 # تحديث تلقائي مستمر
 time.sleep(3)
