@@ -16,11 +16,19 @@ st.set_page_config(
 )
 
 st.title("⚡ روبوت الـ OTC الاحترافي الخاص بالمتداول: صلاح")
-st.markdown("يقوم البوت بفحص السوق مطبقاً الاستراتيجية الاحترافية مع توثيق وقت وصول الإشارة بالثانية.")
+st.markdown("يقوم البوت بفحص السوق مطبقاً الاستراتيجية الاحترافية مع تثبيت وقت الإشارة بدقة.")
 st.markdown("---")
 
 # ==========================================
-# 2. دالة تشغيل التنبيه الصوتي (مع تفعيل تفاعل المستخدم)
+# 2. إدارة الذاكرة المؤقتة (لتثبيت وقت الإشارة)
+# ==========================================
+if 'last_signal_time' not in st.session_state:
+    st.session_state.last_signal_time = None
+if 'last_signal_pair' not in st.session_state:
+    st.session_state.last_signal_pair = None
+
+# ==========================================
+# 3. دالة تشغيل التنبيه الصوتي
 # ==========================================
 def play_sound_alert():
     audio_html = """
@@ -31,7 +39,7 @@ def play_sound_alert():
     st.components.v1.html(audio_html, height=0)
 
 # ==========================================
-# 3. قائمة الأزواج والإعدادات
+# 4. قائمة الأزواج والإعدادات
 # ==========================================
 PAIRS_MAP = {
     "EUR/USD": "EURUSD=X",
@@ -57,7 +65,7 @@ duration_map = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60}
 trade_duration = duration_map.get(TIMEFRAME, 15)
 
 # ==========================================
-# 4. حساب العداد التنازلي
+# 5. حساب العداد التنازلي
 # ==========================================
 def get_candle_countdown(timeframe_minutes):
     now = datetime.now()
@@ -67,7 +75,7 @@ def get_candle_countdown(timeframe_minutes):
     return remaining_seconds // 60, remaining_seconds % 60, remaining_seconds
 
 # ==========================================
-# 5. فحص البيانات بالاستراتيجية الاحترافية
+# 6. فحص البيانات بالاستراتيجية الاحترافية
 # ==========================================
 def scan_otc_strategy(name, symbol, timeframe, use_ema):
     try:
@@ -113,38 +121,41 @@ def scan_otc_strategy(name, symbol, timeframe, use_ema):
                 if not use_ema or (use_ema and price_now < ema_val):
                     signal_type = -1
             
-        # تسجيل وقت وصول الصفقة بدقة (الساعة، الدقيقة، الثانية)
-        signal_time = datetime.now().strftime("%H:%M:%S")
-
         return {
             "name": name,
             "symbol": symbol,
             "price": price_now,
             "rsi": rsi_now,
-            "signal": signal_type,
-            "time": signal_time
+            "signal": signal_type
         }
     except Exception:
         return None
 
 # ==========================================
-# 6. العرض والتنبيهات المستمرة
+# 7. العرض والتنبيهات المستمرة
 # ==========================================
 mins_left, secs_left, total_rem_secs = get_candle_countdown(trade_duration)
 
 st.subheader("⏳ العداد التنازلي لإغلاق الشمعة الحالية")
 col_t1, col_t2 = st.columns([1, 2])
 col_t1.metric("الوقت المتبقي لفتح الشمعة القادمة", f"{mins_left:02d}:{secs_left:02d}")
-col_t2.info("⚡ البوت يعمل بانتظام. (ملاحظة: لضمان عمل الصوت بالموبايل، قم بالضغط مرة واحدة في أي مكان بالصفحة عند فتحها).")
+col_t2.info("⚡ البوت يعمل بانتظام مع تثبيت وقت ظهور الإشارة بدقة.")
 
 st.markdown("---")
 
 with st.spinner("🔍 جاري فحص الأزواج وتطبيق الاستراتيجية الاحترافية..."):
     active_signals = []
+    current_time_str = datetime.now().strftime("%H:%M:%S")
     
     for name, sym in PAIRS_MAP.items():
         res = scan_otc_strategy(name, sym, TIMEFRAME, USE_EMA_FILTER)
         if res is not None and res['signal'] != 0:
+            # إذا كانت هذه الإشارة جديدة ولم تُسجل مسبقاً لهذا الزوج، ثبت وقتها
+            if st.session_state.last_signal_pair != name:
+                st.session_state.last_signal_pair = name
+                st.session_state.last_signal_time = current_time_str
+            
+            res['time'] = st.session_state.last_signal_time
             active_signals.append(res)
 
 if active_signals:
@@ -154,10 +165,12 @@ if active_signals:
     st.success(f"🔥 **مرحباً صلاح، تم العثور على {len(active_signals)} فرصة مطابقة لاستراتيجيتك بدقة!**")
     for item in active_signals:
         sig_text = "🟢 صعود (CALL) - إشارة شراء مؤكدة" if item['signal'] == 1 else "🔴 هبوط (PUT) - إشارة بيع مؤكدة"
-        st.write(f"⏱️ **وقت وصول الإشارة:** `{item['time']}` | 📌 الزوج: **{item['name']}**")
+        st.write(f"⏱️ **وقت وصول الإشارة (ثابت):** `{item['time']}` | 📌 الزوج: **{item['name']}**")
         st.write(f"التوجيه: **{sig_text}** | السعر: **{item['price']:.4f}** | RSI: **{item['rsi']:.1f}**")
         st.markdown("---")
 else:
+    # إذا لم تعد هناك إشارات نشطة، نصفر الذاكرة استعداداً للإشارة القادمة
+    st.session_state.last_signal_pair = None
     st.warning("⚪ البوت يفحص الشارت بنظام الاستراتيجية... بانتظار تشكل الفرصة المناسبة يا صلاح.")
 
 # تحديث تلقائي مستمر بدون توقف
