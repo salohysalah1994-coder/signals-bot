@@ -15,17 +15,17 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📈 روبوت الفوركس الحقيقي (سوق رسمي) - صلاح")
-st.markdown("البوت مخصص للعمل على أزواج الفوركس الرسمية وفقاً لساعات عمل الأسواق العالمية.")
+st.title("📈 روبوت الفوركس الحقيقي (تحديث فوري للشمعة الحالية) - صلاح")
+st.markdown("البوت مبرمج لمسح الصفقة فور انتهاء شمعتها لضمان عدم ظهور أي إشارات قديمة.")
 st.markdown("---")
 
 # ==========================================
-# 2. إدارة الذاكرة المؤقتة
+# 2. إدارة الذاكرة المؤقتة (مرتبطة بتوقيت الشمعة حصراً)
 # ==========================================
-if 'active_signals_cache' not in st.session_state:
-    st.session_state.active_signals_cache = []
-if 'last_checked_candle' not in st.session_state:
-    st.session_state.last_checked_candle = None
+if 'active_signal' not in st.session_state:
+    st.session_state.active_signal = None
+if 'current_active_candle' not in st.session_state:
+    st.session_state.current_active_candle = None
 
 # ==========================================
 # 3. دالة تشغيل التنبيه الصوتي
@@ -135,45 +135,52 @@ def scan_forex_strategy(name, symbol, timeframe, use_ema):
         return None
 
 # ==========================================
-# 7. العرض والتنظيف التلقائي للإشارات القديمة
+# 7. العرض والمسح التلقائي الفوري فور انتهاء الشمعة
 # ==========================================
 mins_left, secs_left, total_rem_secs = get_candle_countdown(trade_duration)
 
 st.subheader("⏳ العداد التنازلي لإغلاق الشمعة الحالية")
 col_t1, col_t2 = st.columns([1, 2])
 col_t1.metric("الوقت المتبقي لإغلاق الشمعة", f"{mins_left:02d}:{secs_left:02d}")
-col_t2.info("📈 البوت متصل بسوق الفوركس الرسمي ويقوم بتحديث الصفقات الحصرية أولاً بأول.")
+col_t2.info("📈 البوت يقوم بمسح الصفقة تلقائياً بمجرد انتهاء توقيت الشمعة الحالية ولن تبقى أي إشارة قديمة.")
 
 st.markdown("---")
 
-if total_rem_secs < 120:  
-    st.session_state.active_signals_cache = []
-
-with st.spinner("🔍 جاري فحص سوق الفوركس الرسمي وتحديث الصفقات..."):
+with st.spinner("🔍 جاري فحص سوق الفوركس الرسمي..."):
     current_time_str = datetime.now().strftime("%H:%M:%S")
-    new_signals = []
+    found_signal = None
     
     for name, sym in PAIRS_MAP.items():
         res = scan_forex_strategy(name, sym, TIMEFRAME, USE_EMA_FILTER)
         if res is not None and res['signal'] != 0:
             res['time'] = current_time_str
-            new_signals.append(res)
-            
-    if new_signals and total_rem_secs > 120:
-        st.session_state.active_signals_cache = new_signals
+            found_signal = res
+            break  # نأخذ أول فرصة مطابقة
 
-if st.session_state.active_signals_cache and total_rem_secs > 120:
-    if ENABLE_SOUND:
-        play_sound_alert()
-        
-    st.success(f"🔥 **ممتاز يا صلاح، تم رصد {len(st.session_state.active_signals_cache)} فرصة فوركس حقيقية ومؤكدة!**")
-    for item in st.session_state.active_signals_cache:
-        sig_text = "🟢 صعود (CALL) - شراء فوركس" if item['signal'] == 1 else "🔴 هبوط (PUT) - بيع فوركس"
-        st.write(f"⏱️ **وقت التوليد:** `{item['time']}` | 📌 الزوج: **{item['name']}**")
-        st.write(f"التوجيه: **{sig_text}** | السعر: **{item['price']:.4f}** | RSI: **{item['rsi']:.1f}**")
-        st.markdown("---")
+# التحقق من توقيت الشمعة: إذا تغيرت الشمعة أو انتهى وقتها، نقوم بتفريغ الذاكرة تماماً
+if found_signal is not None:
+    # إذا كانت شمعة جديدة كلياً مقارنة بما هو مخزن
+    if st.session_state.current_active_candle != found_signal['candle_time']:
+        st.session_state.current_active_candle = found_signal['candle_time']
+        st.session_state.active_signal = found_signal
+        if ENABLE_SOUND:
+            play_sound_alert()
 else:
-    st.warning("⚪ البوت يفحص سوق الفوركس... بانتظار تشكل فرصة نظامية جديدة يا صلاح.")
+    # إذا لم تعد هناك إشارة مطابقة في السوق الحالي، أو دخلنا في الشمعة الأخيرة (أقل من دقيقتين)، نصفر الكاش فوراً
+    if total_rem_secs < 120 or found_signal is None:
+        st.session_state.active_signal = None
+        st.session_state.current_active_candle = None
+
+# عرض الصفقة النشطة فقط إذا كانت تتبع الشمعة الحالية وبقي وقت كافٍ
+if st.session_state.active_signal is not None and total_rem_secs > 120:
+    item = st.session_state.active_signal
+    st.success("🔥 **مرحباً صلاح، تم رصد فرصة فوركس حقيقية ومؤكدة للشمعة الحالية!**")
+    sig_text = "🟢 صعود (CALL) - شراء فوركس" if item['signal'] == 1 else "🔴 هبوط (PUT) - بيع فوركس"
+    st.write(f"⏱️ **وقت التوليد:** `{item['time']}` | 📌 الزوج: **{item['name']}**")
+    st.write(f"التوجيه: **{sig_text}** | السعر: **{item['price']:.4f}** | RSI: **{item['rsi']:.1f}**")
+    st.markdown("---")
+else:
+    st.warning("⚪ البوت يفحص السوق... الصفقات تختفي تلقائياً بمجرد انتهاء وقتها لتبدأ شمعة جديدة نظيفة يا صلاح.")
 
 # تحديث تلقائي مستمر
 time.sleep(3)
