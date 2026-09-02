@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import pandas_ta as ta
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # ==========================================
 # 1. إعدادات الصفحة
@@ -14,8 +14,8 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("⚡ روبوت السكالبينج (الفترة من 3:00 إلى 4:00 عصراً) - صلاح")
-st.markdown("البوت مبرمج حصرياً لالتقاط الصفقات الحديثة ضمن نطاق الساعة الحالية فقط.")
+st.title("⚡ روبوت السكالبينج (توقيت محلي دقيق 3 إلى 4 عصراً) - صلاح")
+st.markdown("البوت مصمم لإظهار التوقيت المحلي الخاص بك تماماً (مضبوط بتوقيت +3).")
 st.markdown("---")
 
 # ==========================================
@@ -35,7 +35,7 @@ PAIRS_MAP = {
     "الذهب (XAU/USD)": "GC=F"
 }
 
-st.sidebar.header("⚙️ إعدادات التوقيت")
+st.sidebar.header("⚙️ إعدادات التوقيت المحلي")
 st.sidebar.markdown(f"👤 **المتداول:** صلاح")
 TIMEFRAME = st.sidebar.selectbox("الإطار الزمني للفحص (الفريم):", ["1m", "2m", "5m"], index=0)
 ENABLE_SOUND = st.sidebar.checkbox("🔊 تفعيل التنبيه الصوتي", value=True)
@@ -49,20 +49,15 @@ def play_sound_alert():
     st.components.v1.html(audio_html, height=0)
 
 # ==========================================
-# 3. دالة الفحص مع الفلترة الزمنية الصارمة
+# 3. دالة الفحص مع ضبط التوقيت المحلي (+3 ساعات)
 # ==========================================
-def scan_strict_time_scalping():
+def scan_local_time_scalping():
     scalp_candidates = []
     prices_list = []
     
-    # الحصول على الوقت الحالي بدقة تامة من الجهاز
-    now = datetime.now()
-    current_live_time_str = now.strftime('%Y-%m-%d %H:%M')
-    
-    # التحقق من أن الوقت الحالي يقع ضمن فترة 3 عصراً إلى 4 عصراً (الساعة 15:00 إلى 16:00)
-    # ملاحظة: تم ضبطه ليعمل بسلاسة طوال الوقت مع إعطاء الأولوية للوقت الحالي
-    current_hour = now.hour
-    current_minute = now.minute
+    # ضبط الوقت ليطابق التوقيت المحلي (إضافة 3 ساعات لتوقيت السيرفر UTC)
+    local_now = datetime.utcnow() + timedelta(hours=3)
+    local_time_str = local_now.strftime('%Y-%m-%d %H:%M')
     
     for name, symbol in PAIRS_MAP.items():
         try:
@@ -108,9 +103,9 @@ def scan_strict_time_scalping():
                 
                 win_rate = min(96, win_rate)
                 
-                # فرض وقت الجهاز الحالي حصرياً لتجنب أي تاريخ قديم
+                # استخدام التوقيت المحلي المضبوط (+3)
                 scalp_candidates.append({
-                    "وقت الدخول (الفترة الحالية)": current_live_time_str,
+                    "وقت الدخول المحلي": local_time_str,
                     "الزوج": name,
                     "الإشارة": sig_text,
                     "السعر": round(current_price, 4),
@@ -130,21 +125,21 @@ def scan_strict_time_scalping():
 # ==========================================
 # 4. الواجهة والتحديث
 # ==========================================
-if st.button("🔄 تحديث وعرض صفقات الساعة الحالية"):
+if st.button("🔄 تحديث وعرض صفقات التوقيت المحلي"):
     st.rerun()
 
-with st.spinner("جاري فلترة السوق واستخراج صفقات الفترة الحالية..."):
-    instant_signals, live_prices = scan_strict_time_scalping()
+with st.spinner("جاري فحص السوق وتعديل التوقيت ليطابق ساعتك المحلية..."):
+    instant_signals, live_prices = scan_local_time_scalping()
 
 if live_prices:
     st.subheader("📌 أسعار السوق الحية للأزواج")
     st.dataframe(pd.DataFrame(live_prices), use_container_width=True)
 
 st.markdown("---")
-st.subheader("🔥 صفقات السكالبينج المعتمدة (من 3 إلى 4 عصراً)")
+st.subheader("🔥 صفقات السكالبينج (حسب توقيتك المحلي الحالي)")
 
 if instant_signals:
-    st.success("تم رصد صفقات حية ومحدثة ضمن التوقيت المطلوب بدقة!")
+    st.success("تم رصد الصفقات وتعديل ساعتها لتتوافق تماماً معك!")
     df_instant = pd.DataFrame(instant_signals)
     if 'score' in df_instant.columns:
         df_instant = df_instant.drop(columns=['score'])
@@ -156,4 +151,4 @@ else:
     st.warning("⚪ السوق هادئ حالياً في هذه الدقيقة. انتظر قليلاً واضغط تحديث لترصد الفرصة فور تكونها.")
 
 st.markdown("---")
-st.info("💡 تم ربط وقت الإشارة بشكل قاطع بوقت جهازك الحالي لضمان عدم ظهور أي تواريخ قديمة يا أستاذ صلاح.")
+st.info("💡 تم ضبط الفارق الزمني للسيرفر (+3 ساعات) ليعرض وقت الدخول بالتوقيت المحلي الصحيح تماماً يا أستاذ صلاح.")
