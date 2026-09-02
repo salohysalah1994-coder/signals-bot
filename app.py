@@ -9,34 +9,17 @@ from datetime import datetime, timedelta
 # 1. إعدادات الصفحة
 # ==========================================
 st.set_page_config(
-    page_title="ماسح صفقات الفوركس (24 ساعة) - صلاح",
+    page_title="ماسح صفقات الفوركس الذكي - صلاح",
     page_icon="📈",
     layout="wide"
 )
 
-st.title("📈 روبوت الفوركس (سجل صفقات آخر 24 ساعة) - صلاح")
-st.markdown("البوت يقوم بمسح السوق وعرض كافة الإشارات والفرص التي ظهرت خلال الـ 24 ساعة الماضية.")
+st.title("📈 روبوت الفوركس الذكي (سجل الصفقات المحدث) - صلاح")
+st.markdown("البوت يقوم بمسح السوق وتحليل الشموع السابقة لعرض الفرص المتاحة.")
 st.markdown("---")
 
 # ==========================================
-# 2. إدارة الذاكرة المؤقتة لسجل الصفقات
-# ==========================================
-if 'signal_history' not in st.session_state:
-    st.session_state.signal_history = []
-
-# ==========================================
-# 3. دالة تشغيل التنبيه الصوتي
-# ==========================================
-def play_sound_alert():
-    audio_html = """
-        <audio autoplay controls style="display:none;">
-            <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
-        </audio>
-    """
-    st.components.v1.html(audio_html, height=0)
-
-# ==========================================
-# 4. قائمة أزواج الفوركس الحقيقية والإعدادات
+# 2. قائمة أزواج الفوركس وإعدادات الشريط الجانبي
 # ==========================================
 PAIRS_MAP = {
     "EUR/USD": "EURUSD=X",
@@ -54,24 +37,20 @@ PAIRS_MAP = {
 
 st.sidebar.header("⚙️ إعدادات سوق الفوركس")
 st.sidebar.markdown(f"👤 **المتداول:** صلاح")
-TIMEFRAME = st.sidebar.selectbox("الإطار الزمني للفحص (الفريم):", ["15m", "30m", "1h", "5m"], index=0)
-ENABLE_SOUND = st.sidebar.checkbox("🔊 تفعيل التنبيه الصوتي عند اكتشاف فرصة جديدة", value=True)
-USE_EMA_FILTER = st.sidebar.checkbox("🛡️ تفعيل فلتر الاتجاه العام (EMA 200)", value=False)
-
-# تحديد فترة جلب البيانات لتغطي آخر 24 ساعة وأكثر
-period_map = {"5m": "2d", "15m": "5d", "30m": "5d", "1h": "7d"}
-fetch_period = period_map.get(TIMEFRAME, "5d")
+TIMEFRAME = st.sidebar.selectbox("الإطار الزمني للفحص (الفريم):", ["1h", "30m", "15m", "5m"], index=0)
 
 # ==========================================
-# 5. دالة فحص وتاريخ الصفقات
+# 3. دالة فحص السوق المبسطة والمضمنة
 # ==========================================
-def scan_all_signals():
-    all_found_signals = []
+def scan_market_signals():
+    signals = []
+    market_prices = []
     
     for name, symbol in PAIRS_MAP.items():
         try:
-            df = yf.download(symbol, period=fetch_period, interval=TIMEFRAME, progress=False)
-            if df.empty or len(df) < 205:
+            # جلب البيانات بطريقة آمنة ومستقرة
+            df = yf.download(symbol, period="5d", interval=TIMEFRAME, progress=False)
+            if df.empty or len(df) < 50:
                 continue
                 
             if isinstance(df.columns, pd.MultiIndex):
@@ -82,83 +61,72 @@ def scan_all_signals():
             df['datetime'] = pd.to_datetime(df[time_col])
             close_series = df['Close'].squeeze()
             
-            # المؤشرات الفنية
-            sma_fast = ta.sma(close_series, length=5)
-            sma_slow = ta.sma(close_series, length=34)
-            buffer1 = sma_fast - sma_slow
-            buffer2 = ta.wma(buffer1, length=5)
-            rsi = ta.rsi(close_series, length=14)
-            ema_200 = ta.ema(close_series, length=200)
+            # حفظ السعر الحالي للزوج لعرضه في لوحة الأسعار
+            current_price = float(close_series.iloc[-1])
+            market_prices.append({"الزوج": name, "السعر الحالي": round(current_price, 4)})
             
-            # فلترة الشموع التي وقعت خلال الـ 24 ساعة الماضية فقط
+            # مؤشرات بسيطة وفعالة لاكتشاف التقاطع (SMA 5 & SMA 20)
+            sma_fast = ta.sma(close_series, length=5)
+            sma_slow = ta.sma(close_series, length=20)
+            
+            if sma_fast is None or sma_slow is None:
+                continue
+                
+            # فحص آخر 10 شموع لتوليد إشارات واضحة
             last_24h_limit = datetime.now() - timedelta(hours=24)
             
-            # فحص الشموع السابقة للبحث عن الإشارات
-            for i in range(200, len(df) - 1):
+            for i in range(25, len(df) - 1):
                 candle_dt = df['datetime'].iloc[i]
-                
-                # تخطي ما هو أقدم من 24 ساعة
                 if candle_dt < last_24h_limit:
                     continue
                 
-                b1_now, b1_prev = buffer1.iloc[i], buffer1.iloc[i - 1]
-                b2_now, b2_prev = buffer2.iloc[i], buffer2.iloc[i - 1]
-                rsi_now = rsi.iloc[i]
-                price_now = close_series.iloc[i]
-                ema_val = ema_200.iloc[i] if ema_200 is not None else price_now
+                f_now, f_prev = sma_fast.iloc[i], sma_fast.iloc[i-1]
+                s_now, s_prev = sma_slow.iloc[i], sma_slow.iloc[i-1]
                 
-                raw_buy = (b1_now > b2_now) and (b1_prev <= b2_prev)
-                raw_sell = (b1_now < b2_now) and (b1_prev >= b2_prev)
+                # شروط التقاطع الصعودي والهبوطي
+                is_buy = (f_now > s_now) and (f_prev <= s_prev)
+                is_sell = (f_now < s_now) and (f_prev >= s_prev)
                 
-                signal_type = 0
-                if raw_buy:
-                    if rsi_now > 50:
-                        if not use_ema or (use_ema and price_now > ema_val):
-                            signal_type = 1
-                elif raw_sell:
-                    if rsi_now < 50:
-                        if not use_ema or (use_ema and price_now < ema_val):
-                            signal_type = -1
-                
-                if signal_type != 0:
-                    all_found_signals.append({
-                        "time": str(candle_dt),
-                        "name": name,
-                        "signal": "🟢 صعود (شراء)" if signal_type == 1 else "🔴 هبوط (بيع)",
-                        "price": round(float(price_now), 4),
-                        "rsi": round(float(rsi_now), 1)
+                if is_buy:
+                    signals.append({
+                        "الوقت": str(candle_dt),
+                        "الزوج": name,
+                        "الإشارة": "🟢 صعود (شراء)",
+                        "السعر عند الإشارة": round(float(close_series.iloc[i]), 4)
+                    })
+                elif is_sell:
+                    signals.append({
+                        "الوقت": str(candle_dt),
+                        "الزوج": name,
+                        "الإشارة": "🔴 هبوط (بيع)",
+                        "السعر عند الإشارة": round(float(close_series.iloc[i]), 4)
                     })
         except Exception:
             continue
             
-    return all_found_signals
+    return signals, market_prices
 
 # ==========================================
-# 6. واجهة العرض والتحديث
+# 4. العرض في واجهة Streamlit
 # ==========================================
-st.subheader("📊 سجل إشارات آخر 24 ساعة")
+if st.button("🔄 فحص السوق وتحديث البيانات الآن"):
+    st.rerun()
 
-if st.button("🔄 تحديث ورصد السوق الآن"):
-    with st.spinner("جاري فحص جميع الأزواج واستخراج صفقات الـ 24 ساعة الماضية..."):
-        st.session_state.signal_history = scan_all_signals()
+with st.spinner("جاري الاتصال بالسوق وفحص الأزواج..."):
+    signals_list, prices_list = scan_market_signals()
 
-# التشغيل التلقائي للفحص عند فتح الصفحة لأول مرة
-if 'executed_initial_scan' not in st.session_state:
-    st.session_state.signal_history = scan_all_signals()
-    st.session_state.executed_initial_scan = True
-
-history = st.session_state.signal_history
-
-if history:
-    st.success(f"تم العثور على {len(history)} إشارة/صفقة خلال الـ 24 ساعة الماضية.")
-    
-    # تحويل البيانات إلى جدول مرتب لعرضها بوضوح
-    df_signals = pd.DataFrame(history)
-    df_signals = df_signals.sort_values(by="time", ascending=False) # الأحدث أولاً
-    
-    st.dataframe(df_signals, use_container_width=True)
-else:
-    st.warning("⚪ لم يتم رصد صفقات مطابقة للشروط خلال الـ 24 ساعة الماضية على هذا الفريم. جرب تغيير فريم الوقت أو إيقاف فلتر الاتجاه من القائمة الجانبية.")
+# عرض أسعار السوق الحية للتأكد من الاتصال
+if prices_list:
+    st.subheader("📌 أسعار السوق الحية الحالية")
+    st.dataframe(pd.DataFrame(prices_list), use_container_width=True)
 
 st.markdown("---")
-st.info("💡 نصيحة: يمكنك النقر فوق زر التحديث في أي وقت لإعادة فحص أحدث بيانات السوق وجلب الصفقات الجديدة.")
+st.subheader("📊 سجل الإشارات والفرص المكتشفة")
+
+if signals_list:
+    st.success(f"تم رصد {len(signals_list)} إشارة خلال الفترة الأخيرة!")
+    df_res = pd.DataFrame(signals_list)
+    df_res = df_res.sort_values(by="الوقت", ascending=False)
+    st.dataframe(df_res, use_container_width=True)
+else:
+    st.warning("⚪ لم يتم رصد إشارات تقاطع على هذا الفريم حالياً. جرب تغيير الإطار الزمني من القائمة الجانبية (مثلاً إلى 1h أو 30m) واضغط على زر التحديث في الأعلى.")
